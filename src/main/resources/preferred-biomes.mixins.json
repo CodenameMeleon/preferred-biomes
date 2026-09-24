@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"package": "net.codenamemeleon.preferredbiomes.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"mixins": [
+		"BlockBreakTraceMixin",
+		"CaveVinesAnchorMixin",
+		"HangingPlacementMixin",
+		"MaterialRuleContextAccessor",
+		"MonsterMixin",
+		"SpawnRestrictionMixin",
+		"SporeBlossomAnchorMixin",
+		"StructureMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

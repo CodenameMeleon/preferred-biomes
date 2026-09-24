@@ -1,0 +1,25 @@
+accessWidener v2 named
+
+# The constructor is private; the two static factories only accept one side of the Either each,
+# and a subclass needs to pass the Either straight through.
+accessible	method	net/minecraft/world/biome/source/MultiNoiseBiomeSource	<init>	(Lcom/mojang/datafixers/util/Either;)V
+
+# The "preset" half of vanilla's codec pair. CUSTOM_CODEC (the "biomes" half) is already public,
+# so only this one needs widening. NOT BIOME_CODEC: that is Biome.REGISTRY_CODEC.fieldOf("biome"),
+# a single biome used as the element codec inside Entries.createCodec, and pairing it with
+# PRESET_CODEC would expect a lone "biome" field where vanilla writes a "biomes" list.
+accessible	field	net/minecraft/world/biome/source/MultiNoiseBiomeSource	PRESET_CODEC	Lcom/mojang/serialization/MapCodec;
+
+# MaterialRuleContext is a protected nested class and BooleanSupplier is package-private, so a
+# MaterialCondition written outside net.minecraft.world.gen.surfacebuilder cannot name either —
+# and MaterialCondition is Function<MaterialRuleContext, BooleanSupplier>, so implementing it
+# requires naming both. These two lines make the TYPES nameable and nothing more; the context's
+# fields stay package-private and are reached through MaterialRuleContextAccessor instead.
+accessible	class	net/minecraft/world/gen/surfacebuilder/MaterialRules$MaterialRuleContext
+accessible	class	net/minecraft/world/gen/surfacebuilder/MaterialRules$BooleanSupplier
+
+# Biome.Weather is a package-private record and Biome.weather is private, so a downfall value
+# cannot be read from outside net.minecraft.world.biome - there is no getDownfall() in 1.20.1,
+# only getTemperature(). This line makes the TYPE nameable and nothing more, exactly as the two
+# MaterialRules lines above do; the field itself is reached through BiomeWeatherAccessor.
+accessible	class	net/minecraft/world/biome/Biome$Weather

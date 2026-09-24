@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "preferred-biomes",
+  "version": "${version}",
+  "name": "Preferred Biomes",
+  "description": "A Minecraft world generation mod.",
+  "authors": [
+    "CodenameMeleon"
+  ],
+  "contact": {
+    "homepage": "https://github.com/CodenameMeleon/preferred-biomes",
+    "sources": "https://github.com/CodenameMeleon/preferred-biomes"
+  },
+  "license": "CC0-1.0",
+  "icon": "assets/preferred-biomes/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.codenamemeleon.preferredbiomes.PreferredBiomes"
+    ],
+    "client": [
+      "net.codenamemeleon.preferredbiomes.client.PreferredBiomesClient"
+    ]
+  },
+  "mixins": [
+    "preferred-biomes.mixins.json",
+    {
+      "config": "preferred-biomes.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "accessWidener": "preferred-biomes.accesswidener",
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "replace": false,
+  "values": [
+    "preferred-biomes:island_shore_frozen_ocean_frozen",
+    "preferred-biomes:island_shore_snowy_taiga_island_frozen",
+    "preferred-biomes:island_shore_snowy_cherry_grove_frozen",
+    "preferred-biomes:island_shore_ice_spikes_island_frozen",
+    "preferred-biomes:island_shore_mushroom_fields_frozen",
+    "preferred-biomes:island_shore_cold_ocean_cold",
+    "preferred-biomes:island_shore_taiga_cold",
+    "preferred-biomes:island_shore_cherry_grove_cold",
+    "preferred-biomes:island_shore_old_growth_pine_taiga_cold",
+    "preferred-biomes:island_shore_mushroom_fields_cold",
+    "preferred-biomes:island_shore_ocean_temperate",
+    "preferred-biomes:island_shore_meadow_temperate",
+    "preferred-biomes:island_shore_windswept_forest_temperate",
+    "preferred-biomes:island_shore_dark_forest_island_temperate",
+    "preferred-biomes:island_shore_mushroom_fields_temperate",
+    "preferred-biomes:island_shore_lukewarm_ocean_lukewarm",
+    "preferred-biomes:island_shore_savanna_lukewarm",
+    "preferred-biomes:island_shore_sparse_jungle_lukewarm",
+    "preferred-biomes:island_shore_bamboo_jungle_lukewarm",
+    "preferred-biomes:island_shore_mushroom_fields_lukewarm",
+    "preferred-biomes:island_shore_warm_ocean_warm",
+    "preferred-biomes:island_shore_savanna_warm",
+    "preferred-biomes:island_shore_desert_island_warm",
+    "preferred-biomes:island_shore_mangrove_island_warm",
+    "preferred-biomes:island_shore_mushroom_fields_warm",
+    "preferred-biomes:island_shore_lush_island_warm"
+  ]
+}

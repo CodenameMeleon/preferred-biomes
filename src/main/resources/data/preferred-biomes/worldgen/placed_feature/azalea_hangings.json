@@ -1,0 +1,9 @@
+{
+  "feature": "preferred-biomes:azalea_hangings",
+  "placement": [
+    {
+      "type": "minecraft:count",
+      "count": 1
+    }
+  ]
+}
