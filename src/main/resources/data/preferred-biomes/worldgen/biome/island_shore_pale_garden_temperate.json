@@ -1,15 +1,18 @@
 {
   "attributes": {
-    "minecraft:visual/sky_color": "#7fa1ff"
+    "minecraft:visual/sky_color": "#7ba4ff"
   },
   "carvers": [
     "minecraft:cave",
     "minecraft:cave_extra_underground",
     "minecraft:canyon"
   ],
-  "downfall": 1.0,
+  "downfall": 0.8,
   "effects": {
-    "water_color": "#3938c9"
+    "dry_foliage_color": "#a0a69c",
+    "foliage_color": "#878d76",
+    "grass_color": "#778272",
+    "water_color": "#3f76e4"
   },
   "features": [
     [],
@@ -18,17 +21,13 @@
       "minecraft:lake_lava_surface"
     ],
     [
-      "minecraft:iceberg_packed",
-      "minecraft:iceberg_blue",
       "minecraft:amethyst_geode"
     ],
     [
       "minecraft:monster_room",
       "minecraft:monster_room_deep"
     ],
-    [
-      "minecraft:blue_ice"
-    ],
+    [],
     [],
     [
       "minecraft:ore_dirt",
@@ -74,7 +73,10 @@
       "minecraft:brown_mushroom_normal",
       "minecraft:red_mushroom_normal",
       "minecraft:patch_pumpkin",
-      "minecraft:patch_firefly_bush_near_water"
+      "minecraft:patch_sugar_cane",
+      "minecraft:patch_firefly_bush_near_water",
+      "minecraft:seagrass_normal",
+      "minecraft:kelp_cold"
     ],
     [
       "minecraft:freeze_top_layer"
@@ -162,5 +164,5 @@
     "water_ambient": [],
     "water_creature": []
   },
-  "temperature": 0.9
+  "temperature": 0.7
 }

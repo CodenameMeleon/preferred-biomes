@@ -1,17 +1,17 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.VerticalSurfaceType;
-import net.minecraft.util.math.noise.DoublePerlinNoiseSampler;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.BiomeKeys;
-import net.minecraft.world.gen.YOffset;
-import net.minecraft.world.gen.noise.NoiseParametersKeys;
-import net.minecraft.world.gen.surfacebuilder.MaterialRules;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.Noises;
+import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.placement.CaveSurface;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 public final class IslandSurface {
 
@@ -25,169 +25,169 @@ public final class IslandSurface {
 
 	private static final int SAND_DEPTH = 2;
 
-	public static final Identifier RED_SAND_NOISE_ID = new Identifier("preferred-biomes", "red_sand");
+	public static final Identifier RED_SAND_NOISE_ID = Identifier.fromNamespaceAndPath("preferred-biomes", "red_sand");
 
-	public static final RegistryKey<DoublePerlinNoiseSampler.NoiseParameters> RED_SAND_NOISE =
-			RegistryKey.of(RegistryKeys.NOISE_PARAMETERS, RED_SAND_NOISE_ID);
+	public static final ResourceKey<NormalNoise.NoiseParameters> RED_SAND_NOISE =
+			ResourceKey.create(Registries.NOISE, RED_SAND_NOISE_ID);
 
 	private static final double RED_SAND_THRESHOLD = 0.15;
 
-	private static RegistryKey<Biome>[] shores(String island, String... bands) {
+	private static ResourceKey<Biome>[] shores(String island, String... bands) {
 		@SuppressWarnings("unchecked")
-		RegistryKey<Biome>[] keys = new RegistryKey[bands.length];
+		ResourceKey<Biome>[] keys = new ResourceKey[bands.length];
 		for (int i = 0; i < bands.length; i++) {
-			keys[i] = RegistryKey.of(RegistryKeys.BIOME, new Identifier("preferred-biomes",
+			keys[i] = ResourceKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath("preferred-biomes",
 					"island_shore_" + island + "_" + bands[i]));
 		}
 		return keys;
 	}
 
-	private static final RegistryKey<Biome>[] FROZEN_SHORES =
+	private static final ResourceKey<Biome>[] FROZEN_SHORES =
 			IslandBiomes.shoresInBand(IslandBiomes.BAND_FROZEN);
-	private static final RegistryKey<Biome>[] COLD_SHORES =
+	private static final ResourceKey<Biome>[] COLD_SHORES =
 			IslandBiomes.shoresInBand(IslandBiomes.BAND_COLD);
-	private static final RegistryKey<Biome>[] TEMPERATE_SHORES =
+	private static final ResourceKey<Biome>[] TEMPERATE_SHORES =
 			IslandBiomes.shoresInBand(IslandBiomes.BAND_TEMPERATE);
-	private static final RegistryKey<Biome>[] LUKEWARM_SHORES =
+	private static final ResourceKey<Biome>[] LUKEWARM_SHORES =
 			IslandBiomes.shoresInBand(IslandBiomes.BAND_LUKEWARM);
-	private static final RegistryKey<Biome>[] WARM_SHORES =
+	private static final ResourceKey<Biome>[] WARM_SHORES =
 			IslandBiomes.shoresInBand(IslandBiomes.BAND_WARM);
 
-	private static final RegistryKey<Biome>[] DESERT_SHORES = shores("desert_island", "warm");
+	private static final ResourceKey<Biome>[] DESERT_SHORES = shores("desert_island", "warm");
 
-	private static final RegistryKey<Biome>[] MUSHROOM_SHORES = shores("mushroom_fields",
+	private static final ResourceKey<Biome>[] MUSHROOM_SHORES = shores("mushroom_fields",
 			"frozen", "cold", "temperate", "lukewarm", "warm");
 
-	private static final RegistryKey<Biome>[] MANGROVE_SHORES = shores("mangrove_island", "warm");
+	private static final ResourceKey<Biome>[] MANGROVE_SHORES = shores("mangrove_island", "warm");
 
-	private static final RegistryKey<Biome>[] LUSH_SHORES = shores("lush_island", "warm");
+	private static final ResourceKey<Biome>[] LUSH_SHORES = shores("lush_island", "warm");
 
-	private static final RegistryKey<Biome>[] ICE_SPIKE_SHORES =
+	private static final ResourceKey<Biome>[] ICE_SPIKE_SHORES =
 			shores("ice_spikes_island", "frozen");
 
-	public static MaterialRules.MaterialRule rule(MaterialRules.MaterialRule vanilla,
+	public static SurfaceRules.RuleSource rule(SurfaceRules.RuleSource vanilla,
 			int size, float frequency, int noise) {
-		MaterialRules.MaterialCondition nearWater =
+		SurfaceRules.ConditionSource nearWater =
 				new IslandShoreCondition(size, frequency, noise);
-		MaterialRules.MaterialCondition atWaterline =
-				MaterialRules.aboveY(YOffset.fixed(BAND_BOTTOM), 0);
-		MaterialRules.MaterialCondition belowBandTop =
-				MaterialRules.not(MaterialRules.aboveY(YOffset.fixed(BAND_TOP), 0));
-		MaterialRules.MaterialCondition depth =
-				MaterialRules.stoneDepth(0, true, SAND_DEPTH, VerticalSurfaceType.FLOOR);
-		MaterialRules.MaterialCondition redSand =
-				MaterialRules.noiseThreshold(RED_SAND_NOISE, RED_SAND_THRESHOLD);
+		SurfaceRules.ConditionSource atWaterline =
+				SurfaceRules.yBlockCheck(VerticalAnchor.absolute(BAND_BOTTOM), 0);
+		SurfaceRules.ConditionSource belowBandTop =
+				SurfaceRules.not(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(BAND_TOP), 0));
+		SurfaceRules.ConditionSource depth =
+				SurfaceRules.stoneDepthCheck(0, true, SAND_DEPTH, CaveSurface.FLOOR);
+		SurfaceRules.ConditionSource redSand =
+				SurfaceRules.noiseCondition(RED_SAND_NOISE, RED_SAND_THRESHOLD);
 
-		MaterialRules.MaterialRule redDesert = MaterialRules.sequence(
-				MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR_WITH_SURFACE_DEPTH,
-						MaterialRules.sequence(
-								MaterialRules.condition(MaterialRules.STONE_DEPTH_CEILING,
-										MaterialRules.block(Blocks.RED_SANDSTONE.getDefaultState())),
-								MaterialRules.block(Blocks.RED_SAND.getDefaultState()))),
-				MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR_WITH_SURFACE_DEPTH_RANGE_30,
-						MaterialRules.block(Blocks.RED_SANDSTONE.getDefaultState())));
+		SurfaceRules.RuleSource redDesert = SurfaceRules.sequence(
+				SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR,
+						SurfaceRules.sequence(
+								SurfaceRules.ifTrue(SurfaceRules.ON_CEILING,
+										SurfaceRules.state(Blocks.RED_SANDSTONE.defaultBlockState())),
+								SurfaceRules.state(Blocks.RED_SAND.defaultBlockState()))),
+				SurfaceRules.ifTrue(SurfaceRules.VERY_DEEP_UNDER_FLOOR,
+						SurfaceRules.state(Blocks.RED_SANDSTONE.defaultBlockState())));
 
-		MaterialRules.MaterialRule redDesertIsland = MaterialRules.condition(
-				MaterialRules.biome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
-				MaterialRules.condition(redSand, redDesert));
+		SurfaceRules.RuleSource redDesertIsland = SurfaceRules.ifTrue(
+				SurfaceRules.isBiome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
+				SurfaceRules.ifTrue(redSand, redDesert));
 
-		MaterialRules.MaterialRule desertIsland = MaterialRules.condition(
-				MaterialRules.biome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
-				MaterialRules.sequence(
-						MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR,
-								MaterialRules.condition(MaterialRules.water(-1, 0),
-										MaterialRules.sequence(
-												MaterialRules.condition(MaterialRules.STONE_DEPTH_CEILING,
-														MaterialRules.block(Blocks.SANDSTONE.getDefaultState())),
-												MaterialRules.block(Blocks.SAND.getDefaultState())))),
-						MaterialRules.condition(MaterialRules.waterWithStoneDepth(-6, -1),
-								MaterialRules.condition(
-										MaterialRules.STONE_DEPTH_FLOOR_WITH_SURFACE_DEPTH_RANGE_30,
-										MaterialRules.block(Blocks.SANDSTONE.getDefaultState())))));
+		SurfaceRules.RuleSource desertIsland = SurfaceRules.ifTrue(
+				SurfaceRules.isBiome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
+				SurfaceRules.sequence(
+						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+								SurfaceRules.ifTrue(SurfaceRules.waterBlockCheck(-1, 0),
+										SurfaceRules.sequence(
+												SurfaceRules.ifTrue(SurfaceRules.ON_CEILING,
+														SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())),
+												SurfaceRules.state(Blocks.SAND.defaultBlockState())))),
+						SurfaceRules.ifTrue(SurfaceRules.waterStartCheck(-6, -1),
+								SurfaceRules.ifTrue(
+										SurfaceRules.VERY_DEEP_UNDER_FLOOR,
+										SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())))));
 
-		MaterialRules.MaterialRule mangroveIsland = MaterialRules.condition(
-				MaterialRules.biome(join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND)),
-				MaterialRules.sequence(
-						MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR,
-								MaterialRules.condition(MaterialRules.aboveY(YOffset.fixed(60), 0),
-										MaterialRules.condition(MaterialRules.not(
-												MaterialRules.aboveY(YOffset.fixed(63), 0)),
-												MaterialRules.condition(
-														MaterialRules.noiseThreshold(
-																NoiseParametersKeys.SURFACE_SWAMP, 0.0),
-														MaterialRules.block(Blocks.WATER.getDefaultState()))))),
-						MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR,
-								MaterialRules.condition(MaterialRules.water(-1, 0),
-										MaterialRules.block(Blocks.MUD.getDefaultState()))),
-						MaterialRules.condition(MaterialRules.waterWithStoneDepth(-6, -1),
-								MaterialRules.condition(
-										MaterialRules.STONE_DEPTH_FLOOR_WITH_SURFACE_DEPTH,
-										MaterialRules.block(Blocks.MUD.getDefaultState())))));
+		SurfaceRules.RuleSource mangroveIsland = SurfaceRules.ifTrue(
+				SurfaceRules.isBiome(join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND)),
+				SurfaceRules.sequence(
+						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+								SurfaceRules.ifTrue(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(60), 0),
+										SurfaceRules.ifTrue(SurfaceRules.not(
+												SurfaceRules.yBlockCheck(VerticalAnchor.absolute(63), 0)),
+												SurfaceRules.ifTrue(
+														SurfaceRules.noiseCondition(
+																Noises.SWAMP, 0.0),
+														SurfaceRules.state(Blocks.WATER.defaultBlockState()))))),
+						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+								SurfaceRules.ifTrue(SurfaceRules.waterBlockCheck(-1, 0),
+										SurfaceRules.state(Blocks.MUD.defaultBlockState()))),
+						SurfaceRules.ifTrue(SurfaceRules.waterStartCheck(-6, -1),
+								SurfaceRules.ifTrue(
+										SurfaceRules.UNDER_FLOOR,
+										SurfaceRules.state(Blocks.MUD.defaultBlockState())))));
 
-		MaterialRules.MaterialRule lushLand = MaterialRules.condition(
-				MaterialRules.biome(join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND)),
-				MaterialRules.condition(MaterialRules.aboveY(YOffset.fixed(63), 0),
-						MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR_WITH_SURFACE_DEPTH,
-								MaterialRules.block(Blocks.STONE.getDefaultState()))));
+		SurfaceRules.RuleSource lushLand = SurfaceRules.ifTrue(
+				SurfaceRules.isBiome(join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND)),
+				SurfaceRules.ifTrue(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(63), 0),
+						SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR,
+								SurfaceRules.state(Blocks.STONE.defaultBlockState()))));
 
-		MaterialRules.MaterialRule submergedFloor = submergedFloor();
+		SurfaceRules.RuleSource submergedFloor = submergedFloor();
 
-		MaterialRules.MaterialRule shore = MaterialRules.condition(atWaterline,
-				MaterialRules.condition(belowBandTop,
-						MaterialRules.condition(nearWater,
-								MaterialRules.condition(depth,
-										MaterialRules.sequence(
+		SurfaceRules.RuleSource shore = SurfaceRules.ifTrue(atWaterline,
+				SurfaceRules.ifTrue(belowBandTop,
+						SurfaceRules.ifTrue(nearWater,
+								SurfaceRules.ifTrue(depth,
+										SurfaceRules.sequence(
 												ring(join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND), Blocks.MOSS_BLOCK),
-												ring(join(MUSHROOM_SHORES, BiomeKeys.MUSHROOM_FIELDS), Blocks.MYCELIUM),
+												ring(join(MUSHROOM_SHORES, Biomes.MUSHROOM_FIELDS), Blocks.MYCELIUM),
 												ring(join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND), Blocks.MUD),
 												ring(join(ICE_SPIKE_SHORES, IslandBiomes.ICE_SPIKES_ISLAND), Blocks.SNOW_BLOCK),
-												MaterialRules.condition(
-														MaterialRules.biome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
-														MaterialRules.condition(redSand,
-																MaterialRules.block(Blocks.RED_SAND.getDefaultState()))),
-												MaterialRules.block(Blocks.SAND.getDefaultState()))))));
+												SurfaceRules.ifTrue(
+														SurfaceRules.isBiome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
+														SurfaceRules.ifTrue(redSand,
+																SurfaceRules.state(Blocks.RED_SAND.defaultBlockState()))),
+												SurfaceRules.state(Blocks.SAND.defaultBlockState()))))));
 
-		return MaterialRules.sequence(
+		return SurfaceRules.sequence(
 				submergedFloor, redDesertIsland, desertIsland, mangroveIsland, lushLand,
 				shore, vanilla);
 	}
 
-	private static MaterialRules.MaterialRule submergedFloor() {
-		MaterialRules.MaterialCondition submerged =
-				MaterialRules.not(MaterialRules.water(-1, 0));
-		MaterialRules.MaterialCondition anyShore = MaterialRules.biome(
+	private static SurfaceRules.RuleSource submergedFloor() {
+		SurfaceRules.ConditionSource submerged =
+				SurfaceRules.not(SurfaceRules.waterBlockCheck(-1, 0));
+		SurfaceRules.ConditionSource anyShore = SurfaceRules.isBiome(
 				join(FROZEN_SHORES, join(COLD_SHORES, join(TEMPERATE_SHORES,
 						join(LUKEWARM_SHORES, WARM_SHORES)))));
-		return MaterialRules.condition(anyShore, MaterialRules.condition(submerged,
-				MaterialRules.sequence(
-						MaterialRules.condition(MaterialRules.waterWithStoneDepth(-6, -1),
-								MaterialRules.condition(MaterialRules.biome(WARM_SHORES),
-										MaterialRules.condition(
-												MaterialRules.stoneDepth(0, true, 6, VerticalSurfaceType.FLOOR),
-												MaterialRules.block(Blocks.SANDSTONE.getDefaultState())))),
-						MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR,
-								MaterialRules.sequence(
-										MaterialRules.condition(
-												MaterialRules.biome(join(WARM_SHORES, LUKEWARM_SHORES)),
-												MaterialRules.sequence(
-														MaterialRules.condition(MaterialRules.STONE_DEPTH_CEILING,
-																MaterialRules.block(Blocks.SANDSTONE.getDefaultState())),
-														MaterialRules.block(Blocks.SAND.getDefaultState()))),
-										MaterialRules.sequence(
-												MaterialRules.condition(MaterialRules.STONE_DEPTH_CEILING,
-														MaterialRules.block(Blocks.STONE.getDefaultState())),
-												MaterialRules.block(Blocks.GRAVEL.getDefaultState())))))));
+		return SurfaceRules.ifTrue(anyShore, SurfaceRules.ifTrue(submerged,
+				SurfaceRules.sequence(
+						SurfaceRules.ifTrue(SurfaceRules.waterStartCheck(-6, -1),
+								SurfaceRules.ifTrue(SurfaceRules.isBiome(WARM_SHORES),
+										SurfaceRules.ifTrue(
+												SurfaceRules.stoneDepthCheck(0, true, 6, CaveSurface.FLOOR),
+												SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())))),
+						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+								SurfaceRules.sequence(
+										SurfaceRules.ifTrue(
+												SurfaceRules.isBiome(join(WARM_SHORES, LUKEWARM_SHORES)),
+												SurfaceRules.sequence(
+														SurfaceRules.ifTrue(SurfaceRules.ON_CEILING,
+																SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())),
+														SurfaceRules.state(Blocks.SAND.defaultBlockState()))),
+										SurfaceRules.sequence(
+												SurfaceRules.ifTrue(SurfaceRules.ON_CEILING,
+														SurfaceRules.state(Blocks.STONE.defaultBlockState())),
+												SurfaceRules.state(Blocks.GRAVEL.defaultBlockState())))))));
 	}
 
-	private static MaterialRules.MaterialRule ring(RegistryKey<Biome>[] biomes, Block block) {
-		return MaterialRules.condition(MaterialRules.biome(biomes),
-				MaterialRules.condition(MaterialRules.STONE_DEPTH_FLOOR,
-						MaterialRules.block(block.getDefaultState())));
+	private static SurfaceRules.RuleSource ring(ResourceKey<Biome>[] biomes, Block block) {
+		return SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes),
+				SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
+						SurfaceRules.state(block.defaultBlockState())));
 	}
 
 	@SafeVarargs
-	private static RegistryKey<Biome>[] join(RegistryKey<Biome>[] first, RegistryKey<Biome>... rest) {
-		RegistryKey<Biome>[] all = java.util.Arrays.copyOf(first, first.length + rest.length);
+	private static ResourceKey<Biome>[] join(ResourceKey<Biome>[] first, ResourceKey<Biome>... rest) {
+		ResourceKey<Biome>[] all = java.util.Arrays.copyOf(first, first.length + rest.length);
 		System.arraycopy(rest, 0, all, first.length, rest.length);
 		return all;
 	}

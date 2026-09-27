@@ -8,15 +8,14 @@ import net.codenamemeleon.preferredbiomes.worldgen.IslandShoreCondition;
 import net.codenamemeleon.preferredbiomes.worldgen.LushIslandPoolFeature;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
 import net.fabricmc.api.ModInitializer;
-
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.SpawnRestriction;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.gen.feature.DefaultFeatureConfig;
-
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.SpawnPlacementTypes;
+import net.minecraft.world.entity.SpawnPlacements;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,26 +26,26 @@ public class PreferredBiomes implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		Registry.register(Registries.BIOME_SOURCE, id("preferred"), PreferredBiomeSource.CODEC);
+		Registry.register(BuiltInRegistries.BIOME_SOURCE, id("preferred"), PreferredBiomeSource.CODEC);
 
-		Registry.register(Registries.DENSITY_FUNCTION_TYPE, id("island_field"),
+		Registry.register(BuiltInRegistries.DENSITY_FUNCTION_TYPE, id("island_field"),
 				IslandField.CODEC_HOLDER.codec());
 
-		Registry.register(Registries.MATERIAL_CONDITION, id("island_shore"),
+		Registry.register(BuiltInRegistries.MATERIAL_CONDITION, id("island_shore"),
 				IslandShoreCondition.CODEC_HOLDER.codec());
 
-		Registry.register(Registries.FEATURE, id("azalea_hangings"),
-				new AzaleaHangingsFeature(DefaultFeatureConfig.CODEC));
-		Registry.register(Registries.FEATURE, id("bare_island_tree"),
-				new BareIslandTreeFeature(DefaultFeatureConfig.CODEC));
-		Registry.register(Registries.FEATURE, id("lush_island_pool_anchor"),
-				new LushIslandPoolFeature(DefaultFeatureConfig.CODEC));
+		Registry.register(BuiltInRegistries.FEATURE, id("azalea_hangings"),
+				new AzaleaHangingsFeature(NoneFeatureConfiguration.CODEC));
+		Registry.register(BuiltInRegistries.FEATURE, id("bare_island_tree"),
+				new BareIslandTreeFeature(NoneFeatureConfiguration.CODEC));
+		Registry.register(BuiltInRegistries.FEATURE, id("lush_island_pool_anchor"),
+				new LushIslandPoolFeature(NoneFeatureConfiguration.CODEC));
 
-		SpawnRestriction.register(EntityType.ALLAY, SpawnRestriction.Location.NO_RESTRICTIONS,
-				Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
+		SpawnPlacements.register(EntityType.ALLAY, SpawnPlacementTypes.NO_RESTRICTIONS,
+				Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
 				(type, world, reason, pos, random) ->
-						world.getBiome(pos).matchesKey(IslandBiomes.DARK_FOREST_ISLAND)
-								&& world.toServerWorld().isDay());
+						world.getBiome(pos).is(IslandBiomes.DARK_FOREST_ISLAND)
+								&& world.getLevel().isBrightOutside());
 
 		if (net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
 			net.codenamemeleon.preferredbiomes.command.ColumnCommand.register();
@@ -56,6 +55,6 @@ public class PreferredBiomes implements ModInitializer {
 	}
 
 	public static Identifier id(String path) {
-		return new Identifier(MOD_ID, path);
+		return Identifier.fromNamespaceAndPath(MOD_ID, path);
 	}
 }

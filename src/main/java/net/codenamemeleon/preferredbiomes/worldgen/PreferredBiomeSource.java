@@ -3,17 +3,17 @@ package net.codenamemeleon.preferredbiomes.worldgen;
 import com.mojang.datafixers.util.Either;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.codenamemeleon.preferredbiomes.PreferredBiomes;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.source.BiomeSource;
-import net.minecraft.world.biome.source.MultiNoiseBiomeSource;
-import net.minecraft.world.biome.source.MultiNoiseBiomeSourceParameterList;
-import net.minecraft.world.biome.source.util.MultiNoiseUtil;
-
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,8 +35,8 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 
 	public static final int DEFAULT_ISLAND_NOISE = 10;
 
-	public static final Codec<PreferredBiomeSource> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			Codec.mapEither(MultiNoiseBiomeSource.CUSTOM_CODEC, MultiNoiseBiomeSource.PRESET_CODEC)
+	public static final MapCodec<PreferredBiomeSource> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			Codec.mapEither(MultiNoiseBiomeSource.DIRECT_CODEC, MultiNoiseBiomeSource.PRESET_CODEC)
 					.forGetter(PreferredBiomeSource::biomeEntries),
 			Identifier.CODEC.listOf().optionalFieldOf("excluded", List.of())
 					.forGetter(PreferredBiomeSource::excludedIds),
@@ -51,13 +51,13 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 			Codec.intRange(MIN_ISLAND_NOISE, MAX_ISLAND_NOISE)
 					.optionalFieldOf("island_noise", DEFAULT_ISLAND_NOISE)
 					.forGetter(PreferredBiomeSource::islandNoise),
-			Biome.REGISTRY_CODEC.listOf()
+			Biome.CODEC.listOf()
 					.optionalFieldOf("declared_biomes", List.of())
 					.forGetter(PreferredBiomeSource::declaredBiomes)
 	).apply(instance, PreferredBiomeSource::new));
 
-	private final Either<MultiNoiseUtil.Entries<RegistryEntry<Biome>>,
-			RegistryEntry<MultiNoiseBiomeSourceParameterList>> biomeEntries;
+	private final Either<Climate.ParameterList<Holder<Biome>>,
+			Holder<MultiNoiseBiomeSourceParameterList>> biomeEntries;
 
 	private final List<Identifier> excludedIds;
 	private final Set<Identifier> excluded;
@@ -67,15 +67,15 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 	private final float islandFrequency;
 	private final int islandNoise;
 
-	private final List<RegistryEntry<Biome>> declaredBiomes;
+	private final List<Holder<Biome>> declaredBiomes;
 
-	private volatile MultiNoiseUtil.Entries<RegistryEntry<Biome>> fallback;
+	private volatile Climate.ParameterList<Holder<Biome>> fallback;
 
 	private volatile boolean fallbackComputed;
 
 	public PreferredBiomeSource(
-			Either<MultiNoiseUtil.Entries<RegistryEntry<Biome>>,
-					RegistryEntry<MultiNoiseBiomeSourceParameterList>> biomeEntries,
+			Either<Climate.ParameterList<Holder<Biome>>,
+					Holder<MultiNoiseBiomeSourceParameterList>> biomeEntries,
 			List<Identifier> excluded, boolean islandSurvivalChallenge, int islandSize,
 			float islandFrequency) {
 		this(biomeEntries, excluded, islandSurvivalChallenge, islandSize, islandFrequency,
@@ -83,10 +83,10 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 	}
 
 	public PreferredBiomeSource(
-			Either<MultiNoiseUtil.Entries<RegistryEntry<Biome>>,
-					RegistryEntry<MultiNoiseBiomeSourceParameterList>> biomeEntries,
+			Either<Climate.ParameterList<Holder<Biome>>,
+					Holder<MultiNoiseBiomeSourceParameterList>> biomeEntries,
 			List<Identifier> excluded, boolean islandSurvivalChallenge, int islandSize,
-			float islandFrequency, int islandNoise, List<RegistryEntry<Biome>> declaredBiomes) {
+			float islandFrequency, int islandNoise, List<Holder<Biome>> declaredBiomes) {
 		super(biomeEntries);
 		this.declaredBiomes = List.copyOf(declaredBiomes);
 		this.biomeEntries = biomeEntries;
@@ -103,8 +103,8 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 				islandNoise);
 	}
 
-	public Either<MultiNoiseUtil.Entries<RegistryEntry<Biome>>,
-			RegistryEntry<MultiNoiseBiomeSourceParameterList>> biomeEntries() {
+	public Either<Climate.ParameterList<Holder<Biome>>,
+			Holder<MultiNoiseBiomeSourceParameterList>> biomeEntries() {
 		return this.biomeEntries;
 	}
 
@@ -128,32 +128,32 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 		return this.islandNoise;
 	}
 
-	public List<RegistryEntry<Biome>> declaredBiomes() {
+	public List<Holder<Biome>> declaredBiomes() {
 		return this.declaredBiomes;
 	}
 
 	@Override
-	protected Codec<? extends BiomeSource> getCodec() {
+	protected MapCodec<? extends BiomeSource> codec() {
 		return CODEC;
 	}
 
-	private MultiNoiseUtil.Entries<RegistryEntry<Biome>> entries() {
-		return this.biomeEntries.map(entries -> entries, listEntry -> listEntry.value().getEntries());
+	private Climate.ParameterList<Holder<Biome>> entries() {
+		return this.biomeEntries.map(entries -> entries, listEntry -> listEntry.value().parameters());
 	}
 
-	private boolean isExcluded(RegistryEntry<Biome> biome) {
-		Optional<RegistryKey<Biome>> key = biome.getKey();
-		return key.isPresent() && this.excluded.contains(key.get().getValue());
+	private boolean isExcluded(Holder<Biome> biome) {
+		Optional<ResourceKey<Biome>> key = biome.unwrapKey();
+		return key.isPresent() && this.excluded.contains(key.get().identifier());
 	}
 
-	private MultiNoiseUtil.Entries<RegistryEntry<Biome>> fallback() {
+	private Climate.ParameterList<Holder<Biome>> fallback() {
 		if (this.fallbackComputed) {
 			return this.fallback;
 		}
 		synchronized (this) {
 			if (!this.fallbackComputed) {
-				List<Pair<MultiNoiseUtil.NoiseHypercube, RegistryEntry<Biome>>> kept = new ArrayList<>();
-				for (Pair<MultiNoiseUtil.NoiseHypercube, RegistryEntry<Biome>> pair : entries().getEntries()) {
+				List<Pair<Climate.ParameterPoint, Holder<Biome>>> kept = new ArrayList<>();
+				for (Pair<Climate.ParameterPoint, Holder<Biome>> pair : entries().values()) {
 					if (!isExcluded(pair.getSecond())) {
 						kept.add(pair);
 					}
@@ -163,7 +163,7 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 							"PreferredBiomeSource: every biome is excluded; leaving the world as vanilla generates it");
 					this.fallback = null;
 				} else {
-					this.fallback = new MultiNoiseUtil.Entries<>(kept);
+					this.fallback = new Climate.ParameterList<>(kept);
 				}
 				this.fallbackComputed = true;
 			}
@@ -172,19 +172,19 @@ public class PreferredBiomeSource extends MultiNoiseBiomeSource {
 	}
 
 	@Override
-	public RegistryEntry<Biome> getBiome(int x, int y, int z, MultiNoiseUtil.MultiNoiseSampler noise) {
-		RegistryEntry<Biome> biome = super.getBiome(x, y, z, noise);
+	public Holder<Biome> getNoiseBiome(int x, int y, int z, Climate.Sampler noise) {
+		Holder<Biome> biome = super.getNoiseBiome(x, y, z, noise);
 		if (!isExcluded(biome)) {
 			return biome;
 		}
-		MultiNoiseUtil.Entries<RegistryEntry<Biome>> remaining = fallback();
-		return remaining == null ? biome : remaining.get(noise.sample(x, y, z));
+		Climate.ParameterList<Holder<Biome>> remaining = fallback();
+		return remaining == null ? biome : remaining.findValue(noise.sample(x, y, z));
 	}
 
 	@Override
-	protected Stream<RegistryEntry<Biome>> biomeStream() {
-		Stream<RegistryEntry<Biome>> selectable =
-				super.biomeStream().filter(biome -> !isExcluded(biome));
+	protected Stream<Holder<Biome>> collectPossibleBiomes() {
+		Stream<Holder<Biome>> selectable =
+				super.collectPossibleBiomes().filter(biome -> !isExcluded(biome));
 		return this.islandSurvivalChallenge && !this.declaredBiomes.isEmpty()
 				? Stream.concat(selectable, this.declaredBiomes.stream())
 				: selectable;

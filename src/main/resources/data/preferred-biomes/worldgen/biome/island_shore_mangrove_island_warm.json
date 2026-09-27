@@ -1,25 +1,19 @@
 {
-  "carvers": {
-    "air": [
-      "minecraft:cave",
-      "minecraft:cave_extra_underground",
-      "minecraft:canyon"
-    ]
+  "attributes": {
+    "minecraft:visual/sky_color": "#7ba4ff",
+    "minecraft:visual/water_fog_color": "#041f33"
   },
+  "carvers": [
+    "minecraft:cave",
+    "minecraft:cave_extra_underground",
+    "minecraft:canyon"
+  ],
   "downfall": 0.9,
   "effects": {
-    "fog_color": 12638463,
-    "foliage_color": 9285927,
+    "dry_foliage_color": "#7b5334",
+    "foliage_color": "#8db127",
     "grass_color_modifier": "swamp",
-    "mood_sound": {
-      "block_search_extent": 8,
-      "offset": 2.0,
-      "sound": "minecraft:ambient.cave",
-      "tick_delay": 6000
-    },
-    "sky_color": 8103167,
-    "water_color": 4445678,
-    "water_fog_color": 270131
+    "water_color": "#43d5ee"
   },
   "features": [
     [],
@@ -58,6 +52,7 @@
       "minecraft:ore_redstone",
       "minecraft:ore_redstone_lower",
       "minecraft:ore_diamond",
+      "minecraft:ore_diamond_medium",
       "minecraft:ore_diamond_large",
       "minecraft:ore_diamond_buried",
       "minecraft:ore_lapis",
@@ -78,7 +73,8 @@
       "minecraft:patch_grass_normal",
       "minecraft:patch_dead_bush",
       "minecraft:patch_waterlily",
-      "minecraft:seagrass_swamp"
+      "minecraft:seagrass_swamp",
+      "minecraft:patch_firefly_bush_near_water"
     ],
     [
       "minecraft:freeze_top_layer"

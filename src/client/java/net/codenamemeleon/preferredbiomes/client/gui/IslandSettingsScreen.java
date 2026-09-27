@@ -1,13 +1,13 @@
 package net.codenamemeleon.preferredbiomes.client.gui;
 
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 public class IslandSettingsScreen extends Screen {
 
@@ -33,7 +33,7 @@ public class IslandSettingsScreen extends Screen {
 
 	public IslandSettingsScreen(Screen parent, int islandSize, float islandFrequency,
 			int islandNoise, Settings onDone) {
-		super(Text.translatable("preferred-biomes.islands.title"));
+		super(Component.translatable("preferred-biomes.islands.title"));
 		this.parent = parent;
 		this.islandSize = islandSize;
 		this.islandFrequency = islandFrequency;
@@ -46,36 +46,35 @@ public class IslandSettingsScreen extends Screen {
 		int centreX = this.width / 2;
 		int y = MARGIN + LINE_H + SPACING * 3;
 
-		addDrawableChild(new SizeSlider(centreX - HALF_W, y, HALF_W * 2, WIDGET_H));
+		addRenderableWidget(new SizeSlider(centreX - HALF_W, y, HALF_W * 2, WIDGET_H));
 		y += WIDGET_H + SPACING;
-		addDrawableChild(new FrequencySlider(centreX - HALF_W, y, HALF_W * 2, WIDGET_H));
+		addRenderableWidget(new FrequencySlider(centreX - HALF_W, y, HALF_W * 2, WIDGET_H));
 		y += WIDGET_H + SPACING;
-		addDrawableChild(new NoiseSlider(centreX - HALF_W, y, HALF_W * 2, WIDGET_H));
+		addRenderableWidget(new NoiseSlider(centreX - HALF_W, y, HALF_W * 2, WIDGET_H));
 
 		int b = this.height - MARGIN - WIDGET_H;
-		addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> {
+		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> {
 			this.onDone.accept(this.islandSize, this.islandFrequency, this.islandNoise);
-			this.close();
-		}).dimensions(centreX - HALF_W, b, HALF_W - SPACING / 2, WIDGET_H).build());
-		addDrawableChild(ButtonWidget.builder(ScreenTexts.CANCEL, button -> this.close())
-				.dimensions(centreX + SPACING / 2, b, HALF_W - SPACING / 2, WIDGET_H).build());
+			this.onClose();
+		}).bounds(centreX - HALF_W, b, HALF_W - SPACING / 2, WIDGET_H).build());
+		addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
+				.bounds(centreX + SPACING / 2, b, HALF_W - SPACING / 2, WIDGET_H).build());
 	}
 
 	@Override
-	public void close() {
-		this.client.setScreen(this.parent);
+	public void onClose() {
+		this.minecraft.setScreen(this.parent);
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		this.renderBackground(context);
-		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, MARGIN, 0xFFFFFF);
+	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+		context.drawCenteredString(this.font, this.title, this.width / 2, MARGIN, 0xFFFFFFFF);
 		super.render(context, mouseX, mouseY, delta);
 	}
 
-	private class SizeSlider extends SliderWidget {
+	private class SizeSlider extends AbstractSliderButton {
 		SizeSlider(int x, int y, int width, int height) {
-			super(x, y, width, height, Text.empty(),
+			super(x, y, width, height, Component.empty(),
 					toFraction(IslandSettingsScreen.this.islandSize));
 			updateMessage();
 		}
@@ -92,7 +91,7 @@ public class IslandSettingsScreen extends Screen {
 
 		@Override
 		protected void updateMessage() {
-			setMessage(Text.translatable("preferred-biomes.islands.size", blocks()));
+			setMessage(Component.translatable("preferred-biomes.islands.size", blocks()));
 		}
 
 		@Override
@@ -101,20 +100,20 @@ public class IslandSettingsScreen extends Screen {
 		}
 	}
 
-	private class FrequencySlider extends SliderWidget {
+	private class FrequencySlider extends AbstractSliderButton {
 		FrequencySlider(int x, int y, int width, int height) {
-			super(x, y, width, height, Text.empty(), IslandSettingsScreen.this.islandFrequency);
+			super(x, y, width, height, Component.empty(), IslandSettingsScreen.this.islandFrequency);
 			updateMessage();
 		}
 
 		private int percent() {
 			int raw = (int) Math.round(this.value * 100.0);
-			return MathHelper.clamp(Math.round((float) raw / FREQUENCY_STEP) * FREQUENCY_STEP, 0, 100);
+			return Mth.clamp(Math.round((float) raw / FREQUENCY_STEP) * FREQUENCY_STEP, 0, 100);
 		}
 
 		@Override
 		protected void updateMessage() {
-			setMessage(Text.translatable("preferred-biomes.islands.frequency", percent()));
+			setMessage(Component.translatable("preferred-biomes.islands.frequency", percent()));
 		}
 
 		@Override
@@ -123,9 +122,9 @@ public class IslandSettingsScreen extends Screen {
 		}
 	}
 
-	private class NoiseSlider extends SliderWidget {
+	private class NoiseSlider extends AbstractSliderButton {
 		NoiseSlider(int x, int y, int width, int height) {
-			super(x, y, width, height, Text.empty(),
+			super(x, y, width, height, Component.empty(),
 					toFraction(IslandSettingsScreen.this.islandNoise));
 			updateMessage();
 		}
@@ -142,7 +141,7 @@ public class IslandSettingsScreen extends Screen {
 
 		@Override
 		protected void updateMessage() {
-			setMessage(Text.translatable("preferred-biomes.islands.noise", level()));
+			setMessage(Component.translatable("preferred-biomes.islands.noise", level()));
 		}
 
 		@Override

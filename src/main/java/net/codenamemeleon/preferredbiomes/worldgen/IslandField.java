@@ -3,19 +3,18 @@ package net.codenamemeleon.preferredbiomes.worldgen;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.util.dynamic.CodecHolder;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.noise.DoublePerlinNoiseSampler;
-import net.minecraft.world.gen.densityfunction.DensityFunction;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.KeyDispatchDataCodec;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 public record IslandField(int size, float frequency, int noise, IslandField.Channel channel,
-		DensityFunction.Noise jitter, DensityFunction.Noise shape,
-		DensityFunction.Noise offset, DensityFunction.Noise temperature)
+		DensityFunction.NoiseHolder jitter, DensityFunction.NoiseHolder shape,
+		DensityFunction.NoiseHolder offset, DensityFunction.NoiseHolder temperature)
 		implements DensityFunction {
 
 	public enum Channel {
@@ -57,13 +56,13 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 			Codec.INT.optionalFieldOf("noise", PreferredBiomeSource.DEFAULT_ISLAND_NOISE)
 					.forGetter(IslandField::noise),
 			CHANNEL_CODEC.fieldOf("channel").forGetter(IslandField::channel),
-			DensityFunction.Noise.CODEC.fieldOf("jitter").forGetter(IslandField::jitter),
-			DensityFunction.Noise.CODEC.fieldOf("shape").forGetter(IslandField::shape),
-			DensityFunction.Noise.CODEC.fieldOf("offset").forGetter(IslandField::offset),
-			DensityFunction.Noise.CODEC.fieldOf("temperature").forGetter(IslandField::temperature)
+			DensityFunction.NoiseHolder.CODEC.fieldOf("jitter").forGetter(IslandField::jitter),
+			DensityFunction.NoiseHolder.CODEC.fieldOf("shape").forGetter(IslandField::shape),
+			DensityFunction.NoiseHolder.CODEC.fieldOf("offset").forGetter(IslandField::offset),
+			DensityFunction.NoiseHolder.CODEC.fieldOf("temperature").forGetter(IslandField::temperature)
 	).apply(instance, IslandField::new));
 
-	public static final CodecHolder<IslandField> CODEC_HOLDER = CodecHolder.of(MAP_CODEC);
+	public static final KeyDispatchDataCodec<IslandField> CODEC_HOLDER = KeyDispatchDataCodec.of(MAP_CODEC);
 
 	public static final double SHELF_MIN = 150.0;
 
@@ -157,7 +156,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 	}
 
 	private double roll(double mx, double mz, int k) {
-		double v = this.jitter.sample(mx + 7.0 * k, 0.0, mz + 13.0 * k) * 4096.0 + 0.5;
+		double v = this.jitter.getValue(mx + 7.0 * k, 0.0, mz + 13.0 * k) * 4096.0 + 0.5;
 		return v - Math.floor(v);
 	}
 
@@ -177,7 +176,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 		return shapeOf((int) Math.floor(blockX / g), (int) Math.floor(blockZ / g), g);
 	}
 
-	private record ShapeKey(DoublePerlinNoiseSampler sampler, int size, float frequency, int noise,
+	private record ShapeKey(NormalNoise sampler, int size, float frequency, int noise,
 			int cellX, int cellZ) {
 	}
 
@@ -221,7 +220,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 		double rampSlope = RAMP_MIN + roll(mx, mz, 7) * (RAMP_MAX - RAMP_MIN);
 
 		double u2 = roll(mx, mz, 2);
-		int hTop = MathHelper.clamp(1 + (int) Math.floor(u2 * u2 * 5.0), 1,
+		int hTop = Mth.clamp(1 + (int) Math.floor(u2 * u2 * 5.0), 1,
 				Math.max(1, (int) Math.floor(radius * rampSlope / PLATEAU_DIVISOR)));
 
 		double shelfWidth = SHELF_MIN + roll(mx, mz, 6) * (SHELF_MAX - SHELF_MIN);
@@ -288,7 +287,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 
 	private static final int COARSE = 4;
 
-	private record OutlineKey(DoublePerlinNoiseSampler sampler, int size, int noise,
+	private record OutlineKey(NormalNoise sampler, int size, int noise,
 			int cellX, int cellZ) {
 	}
 
@@ -319,9 +318,9 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 	}
 
 	private boolean landAt(int x, int z, Shape shape, double maskRadius, double k1, double k2) {
-		double n1 = MathHelper.clamp(MASK_CALIBRATION * this.shape.sample(x * k1, 0.0, z * k1),
+		double n1 = Mth.clamp(MASK_CALIBRATION * this.shape.getValue(x * k1, 0.0, z * k1),
 				-MASK_CLAMP, MASK_CLAMP);
-		double n2 = MathHelper.clamp(MASK_CALIBRATION * this.shape.sample(
+		double n2 = Mth.clamp(MASK_CALIBRATION * this.shape.getValue(
 				x * k2 + MASK_OCTAVE_OFFSET, 0.0, z * k2 + MASK_OCTAVE_OFFSET),
 				-MASK_CLAMP, MASK_CLAMP);
 		double n = (n1 + MASK_OCTAVE_2 * n2) / ((1.0 + MASK_OCTAVE_2) * MASK_CLAMP) * maskGain();
@@ -333,7 +332,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 
 	private double clampedNoise(int x, int z, double wavelength, double offset) {
 		double k = SHAPE_NOISE_WAVELENGTH / wavelength;
-		return MathHelper.clamp(this.shape.sample(x * k + offset, 0.0, z * k + offset), -1.0, 1.0);
+		return Mth.clamp(this.shape.getValue(x * k + offset, 0.0, z * k + offset), -1.0, 1.0);
 	}
 
 	private double looseShoreDistance(double s, int x, int z) {
@@ -518,13 +517,13 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 	}
 
 	private double vanillaTemperatureAt(double x, double z) {
-		double sx = this.offset.sample(x * 0.25, 0.0, z * 0.25) * 4.0;
-		double sz = this.offset.sample(z * 0.25, x * 0.25, 0.0) * 4.0;
-		return this.temperature.sample(x * 0.25 + sx, 0.0, z * 0.25 + sz);
+		double sx = this.offset.getValue(x * 0.25, 0.0, z * 0.25) * 4.0;
+		double sz = this.offset.getValue(z * 0.25, x * 0.25, 0.0) * 4.0;
+		return this.temperature.getValue(x * 0.25 + sx, 0.0, z * 0.25 + sz);
 	}
 
 	@Override
-	public double sample(DensityFunction.NoisePos pos) {
+	public double compute(DensityFunction.FunctionContext pos) {
 		double g = cellSize();
 		int cx = (int) Math.floor(pos.blockX() / g);
 		int cz = (int) Math.floor(pos.blockZ() / g);
@@ -551,7 +550,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 			double dx = pos.blockX() - shape.centreX();
 			double dz = pos.blockZ() - shape.centreZ();
 			double f = Math.hypot(dx, dz) - shape.radius() * maskReach();
-			double w = MathHelper.clamp((f - ANCHOR_HOLD) / ANCHOR_FADE, 0.0, 1.0);
+			double w = Mth.clamp((f - ANCHOR_HOLD) / ANCHOR_FADE, 0.0, 1.0);
 			if (w <= 0.0) {
 				return anchor;
 			}
@@ -590,8 +589,8 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 			y = WATERLINE - FACE_SLOPE * Math.min(s, FACE_WIDTH);
 		}
 		if (raw >= FACE_WIDTH && d > FACE_WIDTH) {
-			double in = MathHelper.clamp((d - FACE_WIDTH) / SHELF_NOISE_IN, 0.0, 1.0);
-			double out = MathHelper.clamp(
+			double in = Mth.clamp((d - FACE_WIDTH) / SHELF_NOISE_IN, 0.0, 1.0);
+			double out = Mth.clamp(
 					(FACE_WIDTH + shape.shelfWidth() - d) / SHELF_NOISE_OUT, 0.0, 1.0);
 			double shelf = (WATERLINE - FACE_DROP)
 					- (WATERLINE - FACE_DROP - FLOOR) * ((d - FACE_WIDTH) / shape.shelfWidth())
@@ -602,15 +601,15 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 	}
 
 	@Override
-	public void fill(double[] densities, DensityFunction.EachApplier applier) {
-		applier.fill(densities, this);
+	public void fillArray(double[] densities, DensityFunction.ContextProvider applier) {
+		applier.fillAllDirectly(densities, this);
 	}
 
 	@Override
-	public DensityFunction apply(DensityFunction.DensityFunctionVisitor visitor) {
+	public DensityFunction mapAll(DensityFunction.Visitor visitor) {
 		return visitor.apply(new IslandField(this.size, this.frequency, this.noise, this.channel,
-				visitor.apply(this.jitter), visitor.apply(this.shape),
-				visitor.apply(this.offset), visitor.apply(this.temperature)));
+				visitor.visitNoise(this.jitter), visitor.visitNoise(this.shape),
+				visitor.visitNoise(this.offset), visitor.visitNoise(this.temperature)));
 	}
 
 	@Override
@@ -639,7 +638,7 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 	}
 
 	@Override
-	public CodecHolder<? extends DensityFunction> getCodecHolder() {
+	public KeyDispatchDataCodec<? extends DensityFunction> codec() {
 		return CODEC_HOLDER;
 	}
 }

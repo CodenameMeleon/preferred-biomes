@@ -5,27 +5,26 @@ import net.codenamemeleon.preferredbiomes.PreferredBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandTerrain;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.resource.DataConfiguration;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Difficulty;
-import net.minecraft.world.GameMode;
-import net.minecraft.world.GameRules;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.dimension.DimensionOptionsRegistryHolder;
-import net.minecraft.world.gen.GeneratorOptions;
-import net.minecraft.world.gen.WorldPreset;
-import net.minecraft.world.gen.WorldPresets;
-import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
-import net.minecraft.world.level.LevelInfo;
-
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.WorldDimensions;
+import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.presets.WorldPreset;
+import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,9 +35,9 @@ public final class DebugWorldRunner {
 
 	private static final int CHUNK_TIMEOUT_TICKS = 600;
 
-	private static final RegistryKey<net.minecraft.world.biome.source.MultiNoiseBiomeSourceParameterList>
-			OVERWORLD_PARAMETERS = RegistryKey.of(
-					RegistryKeys.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST, new Identifier("overworld"));
+	private static final ResourceKey<net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList>
+			OVERWORLD_PARAMETERS = ResourceKey.create(
+					Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST, Identifier.parse("overworld"));
 
 	private static String tpArgument;
 	private static final List<String> commands = new ArrayList<>();
@@ -100,22 +99,22 @@ public final class DebugWorldRunner {
 				seed, islandSize, islandFrequency, islandNoise, tpArgument, commands.size());
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			if (!created && client.currentScreen instanceof TitleScreen) {
+			if (!created && client.screen instanceof TitleScreen) {
 				created = true;
 				createWorld(client, seed);
 				return;
 			}
-			if (created && !ran && client.getServer() != null && client.player != null) {
+			if (created && !ran && client.getSingleplayerServer() != null && client.player != null) {
 				if (!teleported) {
 					if (++settleTicks < 40) {
 						return;
 					}
 					teleported = true;
-					teleport(client.getServer());
+					teleport(client.getSingleplayerServer());
 					return;
 				}
 				waitTicks++;
-				MinecraftServer server = client.getServer();
+				MinecraftServer server = client.getSingleplayerServer();
 				if (chunksReady(server)) {
 					ran = true;
 					PreferredBiomes.LOGGER.info("[PB-AUTORUN] chunks ready after {} ticks", waitTicks);
@@ -131,30 +130,31 @@ public final class DebugWorldRunner {
 		});
 	}
 
-	private static void createWorld(MinecraftClient client, long seed) {
+	private static void createWorld(Minecraft client, long seed) {
 		PreferredBiomes.LOGGER.info("[PB-AUTORUN] creating world");
-		LevelInfo levelInfo = new LevelInfo("pb-autorun", GameMode.CREATIVE, false,
-				Difficulty.PEACEFUL, true, new GameRules(), DataConfiguration.SAFE_MODE);
-		client.createIntegratedServerLoader().createAndStart("pb-autorun", levelInfo,
-				new GeneratorOptions(seed, true, false), DebugWorldRunner::dimensions);
+		LevelSettings levelInfo = new LevelSettings("pb-autorun", GameType.CREATIVE, false,
+				Difficulty.PEACEFUL, true, new GameRules(WorldDataConfiguration.DEFAULT.enabledFeatures()),
+				WorldDataConfiguration.DEFAULT);
+		client.createWorldOpenFlows().createFreshLevel("pb-autorun", levelInfo,
+				new WorldOptions(seed, true, false), DebugWorldRunner::dimensions, client.screen);
 	}
 
-	private static DimensionOptionsRegistryHolder dimensions(DynamicRegistryManager registryManager) {
-		WorldPreset normal = registryManager.get(RegistryKeys.WORLD_PRESET).getOrThrow(WorldPresets.DEFAULT);
-		DimensionOptionsRegistryHolder base = normal.createDimensionsRegistryHolder();
+	private static WorldDimensions dimensions(HolderLookup.Provider registryManager) {
+		WorldPreset normal = registryManager.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.NORMAL).value();
+		WorldDimensions base = normal.createWorldDimensions();
 
 		int size = islandSize;
 		float frequency = islandFrequency;
 		int noise = islandNoise;
-		var parameters = registryManager.get(RegistryKeys.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
-				.entryOf(OVERWORLD_PARAMETERS);
-		var settings = RegistryEntry.of(
+		var parameters = registryManager.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+				.getOrThrow(OVERWORLD_PARAMETERS);
+		var settings = Holder.direct(
 				IslandTerrain.createSettings(registryManager, size, frequency, noise));
 		var source = new PreferredBiomeSource(
 				Either.left(net.codenamemeleon.preferredbiomes.worldgen.IslandBiomes.entries(
-						registryManager.getWrapperOrThrow(RegistryKeys.BIOME))),
+						registryManager.lookupOrThrow(Registries.BIOME))),
 				List.of(), true, size, frequency, noise, List.of());
-		return base.with(registryManager, new NoiseChunkGenerator(source, settings));
+		return base.replaceOverworldGenerator(registryManager, new NoiseBasedChunkGenerator(source, settings));
 	}
 
 	private static void teleport(MinecraftServer server) {
@@ -170,7 +170,7 @@ public final class DebugWorldRunner {
 	}
 
 	private static boolean chunksReady(MinecraftServer server) {
-		ServerWorld world = server.getOverworld();
+		ServerLevel world = server.overworld();
 		int cx = targetX >> 4;
 		int cz = targetZ >> 4;
 		for (int dx = -1; dx <= 1; dx++) {
@@ -194,6 +194,6 @@ public final class DebugWorldRunner {
 
 	private static void dispatch(MinecraftServer server, String command) {
 		PreferredBiomes.LOGGER.info("[PB-AUTORUN] > {}", command);
-		server.getCommandManager().executeWithPrefix(server.getCommandSource(), command);
+		server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command);
 	}
 }

@@ -5,31 +5,30 @@ import net.codenamemeleon.preferredbiomes.PreferredBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandTerrain;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.world.CreateWorldScreen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.world.GeneratorOptionsHolder;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.BiomeKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.biome.source.MultiNoiseBiomeSourceParameterList;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
-import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.client.gui.screens.worldselection.WorldCreationContext;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,7 +48,7 @@ public class PreferredBiomesScreen extends Screen {
 
 	private static final int FILTER_W = (HALF_W * 2 - SPACING * 2) / 3;
 
-	private static final Text FILTER_ALL = Text.translatable("preferred-biomes.screen.filter.all");
+	private static final Component FILTER_ALL = Component.translatable("preferred-biomes.screen.filter.all");
 
 	private static final int LABEL_PADDING = 8;
 
@@ -65,12 +64,12 @@ public class PreferredBiomesScreen extends Screen {
 
 	private static final int GUTTER = 12;
 
-	private static final RegistryKey<MultiNoiseBiomeSourceParameterList> OVERWORLD_PARAMETERS =
-			RegistryKey.of(RegistryKeys.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST,
-					new Identifier("overworld"));
+	private static final ResourceKey<MultiNoiseBiomeSourceParameterList> OVERWORLD_PARAMETERS =
+			ResourceKey.create(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST,
+					Identifier.parse("overworld"));
 
 	private final CreateWorldScreen parent;
-	private final GeneratorOptionsHolder generatorOptionsHolder;
+	private final WorldCreationContext generatorOptionsHolder;
 	private final BiomeCatalog catalog;
 
 	private final Set<Identifier> selected = new LinkedHashSet<>();
@@ -88,28 +87,28 @@ public class PreferredBiomesScreen extends Screen {
 	private boolean tooltipWidthWarned;
 
 	private BiomeListWidget list;
-	private TextFieldWidget search;
-	private CyclingButtonWidget<BiomeListWidget.Sort> sortButton;
-	private CyclingButtonWidget<Optional<BiomeCatalog.Temperature>> temperatureButton;
-	private CyclingButtonWidget<Optional<BiomeCatalog.Humidity>> humidityButton;
-	private CyclingButtonWidget<Optional<String>> modButton;
-	private ButtonWidget selectAll;
-	private ButtonWidget selectNone;
-	private ButtonWidget islandSettings;
-	private ButtonWidget done;
+	private EditBox search;
+	private CycleButton<BiomeListWidget.Sort> sortButton;
+	private CycleButton<Optional<BiomeCatalog.Temperature>> temperatureButton;
+	private CycleButton<Optional<BiomeCatalog.Humidity>> humidityButton;
+	private CycleButton<Optional<String>> modButton;
+	private Button selectAll;
+	private Button selectNone;
+	private Button islandSettings;
+	private Button done;
 	private int counterY;
 	private int challengeNoteY;
 
-	public PreferredBiomesScreen(CreateWorldScreen parent, GeneratorOptionsHolder generatorOptionsHolder) {
-		super(Text.translatable("preferred-biomes.screen.title"));
+	public PreferredBiomesScreen(CreateWorldScreen parent, WorldCreationContext generatorOptionsHolder) {
+		super(Component.translatable("preferred-biomes.screen.title"));
 		this.parent = parent;
 		this.generatorOptionsHolder = generatorOptionsHolder;
-		this.catalog = BiomeCatalog.build(generatorOptionsHolder.getCombinedRegistryManager());
+		this.catalog = BiomeCatalog.build(generatorOptionsHolder.worldgenLoadContext());
 		readCurrentSettings();
 	}
 
 	private void readCurrentSettings() {
-		ChunkGenerator generator = this.generatorOptionsHolder.selectedDimensions().getChunkGenerator();
+		ChunkGenerator generator = this.generatorOptionsHolder.selectedDimensions().overworld();
 		if (!(generator.getBiomeSource() instanceof PreferredBiomeSource source)) {
 			return;
 		}
@@ -130,65 +129,61 @@ public class PreferredBiomesScreen extends Screen {
 		int centreX = this.width / 2;
 
 		int y = MARGIN + LINE_H + SPACING;
-		String previousFilter = this.search == null ? "" : this.search.getText();
+		String previousFilter = this.search == null ? "" : this.search.getValue();
 		int searchW = HALF_W * 2 - SORT_W - SPACING;
-		this.search = new TextFieldWidget(this.textRenderer, centreX - HALF_W, y, searchW, WIDGET_H,
-				Text.translatable("preferred-biomes.screen.search"));
-		this.search.setPlaceholder(Text.translatable("preferred-biomes.screen.search")
-				.copy().formatted(Formatting.DARK_GRAY));
-		this.search.setChangedListener(text -> {
+		this.search = new EditBox(this.font, centreX - HALF_W, y, searchW, WIDGET_H,
+				Component.translatable("preferred-biomes.screen.search"));
+		this.search.setHint(Component.translatable("preferred-biomes.screen.search")
+				.copy().withStyle(ChatFormatting.DARK_GRAY));
+		this.search.setResponder(text -> {
 			if (this.list != null) {
 				this.list.setFilter(text);
 			}
 		});
-		this.search.setText(previousFilter);
-		addDrawableChild(this.search);
+		this.search.setValue(previousFilter);
+		addRenderableWidget(this.search);
 
-		this.sortButton = addDrawableChild(CyclingButtonWidget
+		this.sortButton = addRenderableWidget(CycleButton
 				.<BiomeListWidget.Sort>builder(value ->
-						Text.translatable("preferred-biomes.screen.sort." + key(value.name())))
-				.values(BiomeListWidget.Sort.values())
-				.initially(this.sort)
-				.omitKeyText()
-				.build(centreX - HALF_W + searchW + SPACING, y, SORT_W, WIDGET_H,
-						Text.translatable("preferred-biomes.screen.sort"),
+						Component.translatable("preferred-biomes.screen.sort." + key(value.name())), this.sort)
+				.withValues(BiomeListWidget.Sort.values())
+				.displayOnlyValue()
+				.create(centreX - HALF_W + searchW + SPACING, y, SORT_W, WIDGET_H,
+						Component.translatable("preferred-biomes.screen.sort"),
 						(button, value) -> {
 							this.sort = value;
 							this.list.setSort(value);
 						}));
 		y += WIDGET_H + SPACING;
 
-		this.temperatureButton = addDrawableChild(CyclingButtonWidget
+		this.temperatureButton = addRenderableWidget(CycleButton
 				.<Optional<BiomeCatalog.Temperature>>builder(value -> value
-						.<Text>map(band -> Text.translatable("preferred-biomes.screen.filter." + key(band.name())))
-						.orElse(FILTER_ALL))
-				.values(withAll(List.of(BiomeCatalog.Temperature.values())))
-				.initially(this.temperatureFilter)
-				.build(centreX - HALF_W, y, FILTER_W, WIDGET_H,
-						Text.translatable("preferred-biomes.screen.filter.temperature"),
+						.<Component>map(band -> Component.translatable("preferred-biomes.screen.filter." + key(band.name())))
+						.orElse(FILTER_ALL), this.temperatureFilter)
+				.withValues(withAll(List.of(BiomeCatalog.Temperature.values())))
+				.create(centreX - HALF_W, y, FILTER_W, WIDGET_H,
+						Component.translatable("preferred-biomes.screen.filter.temperature"),
 						(button, value) -> {
 							this.temperatureFilter = value;
 							this.list.setTemperature(value.orElse(null));
 						}));
-		this.humidityButton = addDrawableChild(CyclingButtonWidget
+		this.humidityButton = addRenderableWidget(CycleButton
 				.<Optional<BiomeCatalog.Humidity>>builder(value -> value
-						.<Text>map(band -> Text.translatable("preferred-biomes.screen.filter." + key(band.name())))
-						.orElse(FILTER_ALL))
-				.values(withAll(List.of(BiomeCatalog.Humidity.values())))
-				.initially(this.humidityFilter)
-				.build(centreX - HALF_W + FILTER_W + SPACING, y, FILTER_W, WIDGET_H,
-						Text.translatable("preferred-biomes.screen.filter.humidity"),
+						.<Component>map(band -> Component.translatable("preferred-biomes.screen.filter." + key(band.name())))
+						.orElse(FILTER_ALL), this.humidityFilter)
+				.withValues(withAll(List.of(BiomeCatalog.Humidity.values())))
+				.create(centreX - HALF_W + FILTER_W + SPACING, y, FILTER_W, WIDGET_H,
+						Component.translatable("preferred-biomes.screen.filter.humidity"),
 						(button, value) -> {
 							this.humidityFilter = value;
 							this.list.setHumidity(value.orElse(null));
 						}));
-		this.modButton = addDrawableChild(CyclingButtonWidget
-				.<Optional<String>>builder(this::modLabel)
-				.values(withAll(BiomeListWidget.modNames(this.catalog)))
-				.initially(this.modFilter)
-				.omitKeyText()
-				.build(centreX - HALF_W + (FILTER_W + SPACING) * 2, y, FILTER_W, WIDGET_H,
-						Text.translatable("preferred-biomes.screen.filter.mod"),
+		this.modButton = addRenderableWidget(CycleButton
+				.<Optional<String>>builder(this::modLabel, this.modFilter)
+				.withValues(withAll(BiomeListWidget.modNames(this.catalog)))
+				.displayOnlyValue()
+				.create(centreX - HALF_W + (FILTER_W + SPACING) * 2, y, FILTER_W, WIDGET_H,
+						Component.translatable("preferred-biomes.screen.filter.mod"),
 						(button, value) -> {
 							this.modFilter = value;
 							this.list.setMod(value.orElse(null));
@@ -197,70 +192,70 @@ public class PreferredBiomesScreen extends Screen {
 		updateModTooltip();
 		y += WIDGET_H + SPACING;
 
-		this.selectAll = addDrawableChild(ButtonWidget.builder(
-						Text.translatable("preferred-biomes.screen.select_all"),
+		this.selectAll = addRenderableWidget(Button.builder(
+						Component.translatable("preferred-biomes.screen.select_all"),
 						button -> this.list.setVisibleSelected(true))
-				.dimensions(centreX - HALF_W, y, HALF_W - SPACING / 2, WIDGET_H).build());
-		this.selectNone = addDrawableChild(ButtonWidget.builder(
-						Text.translatable("preferred-biomes.screen.select_none"),
+				.bounds(centreX - HALF_W, y, HALF_W - SPACING / 2, WIDGET_H).build());
+		this.selectNone = addRenderableWidget(Button.builder(
+						Component.translatable("preferred-biomes.screen.select_none"),
 						button -> this.list.setVisibleSelected(false))
-				.dimensions(centreX + SPACING / 2, y, HALF_W - SPACING / 2, WIDGET_H).build());
+				.bounds(centreX + SPACING / 2, y, HALF_W - SPACING / 2, WIDGET_H).build());
 		y += WIDGET_H + SPACING;
 
 		int b = this.height - MARGIN - WIDGET_H;
-		this.done = addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, button -> apply())
-				.dimensions(centreX - HALF_W, b, HALF_W - SPACING / 2, WIDGET_H).build());
-		addDrawableChild(ButtonWidget.builder(ScreenTexts.CANCEL, button -> this.close())
-				.dimensions(centreX + SPACING / 2, b, HALF_W - SPACING / 2, WIDGET_H).build());
+		this.done = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> apply())
+				.bounds(centreX - HALF_W, b, HALF_W - SPACING / 2, WIDGET_H).build());
+		addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
+				.bounds(centreX + SPACING / 2, b, HALF_W - SPACING / 2, WIDGET_H).build());
 
 		b -= SPACING + LINE_H;
 		this.challengeNoteY = b;
 
 		b -= SPACING + WIDGET_H;
-		addDrawableChild(CyclingButtonWidget.onOffBuilder(this.islandChallenge)
-				.build(centreX - HALF_W, b, HALF_W - SPACING / 2, WIDGET_H,
-						Text.translatable("preferred-biomes.screen.challenge"),
+		addRenderableWidget(CycleButton.onOffBuilder(this.islandChallenge)
+				.create(centreX - HALF_W, b, HALF_W - SPACING / 2, WIDGET_H,
+						Component.translatable("preferred-biomes.screen.challenge"),
 						(button, value) -> {
 							this.islandChallenge = value;
 							refresh();
 						}));
-		this.islandSettings = addDrawableChild(ButtonWidget.builder(
-						Text.translatable("preferred-biomes.screen.island_settings"),
-						button -> this.client.setScreen(new IslandSettingsScreen(this,
+		this.islandSettings = addRenderableWidget(Button.builder(
+						Component.translatable("preferred-biomes.screen.island_settings"),
+						button -> this.minecraft.setScreen(new IslandSettingsScreen(this,
 								this.islandSize, this.islandFrequency, this.islandNoise,
 								(size, frequency, noise) -> {
 									this.islandSize = size;
 									this.islandFrequency = frequency;
 									this.islandNoise = noise;
 								})))
-				.dimensions(centreX + SPACING / 2, b, HALF_W - SPACING / 2, WIDGET_H).build());
+				.bounds(centreX + SPACING / 2, b, HALF_W - SPACING / 2, WIDGET_H).build());
 
 		b -= SPACING + LINE_H;
 		this.counterY = b;
 		b -= SPACING;
 
-		this.list = new BiomeListWidget(this.client, this.width, y, b,
+		this.list = new BiomeListWidget(this.minecraft, this.width, y, b,
 				this.catalog, this.selected, this::refresh);
 		this.list.setSort(this.sort);
 		this.list.setTemperature(this.temperatureFilter.orElse(null));
 		this.list.setHumidity(this.humidityFilter.orElse(null));
 		this.list.setMod(this.modFilter.orElse(null));
 		this.list.setFilter(previousFilter);
-		addSelectableChild(this.list);
+		addWidget(this.list);
 
 		refresh();
 	}
 
-	private Text modLabel(Optional<String> value) {
-		MutableText label = Text.translatable("preferred-biomes.screen.filter.mod").append(": ");
+	private Component modLabel(Optional<String> value) {
+		MutableComponent label = Component.translatable("preferred-biomes.screen.filter.mod").append(": ");
 		if (value.isEmpty()) {
 			return label.append(FILTER_ALL);
 		}
 		String name = value.get();
-		int room = FILTER_W - LABEL_PADDING - this.textRenderer.getWidth(label);
-		String trimmed = this.textRenderer.trimToWidth(name, room);
+		int room = FILTER_W - LABEL_PADDING - this.font.width(label);
+		String trimmed = this.font.plainSubstrByWidth(name, room);
 		if (trimmed.length() < name.length()) {
-			trimmed = this.textRenderer.trimToWidth(name, room - this.textRenderer.getWidth(ELLIPSIS))
+			trimmed = this.font.plainSubstrByWidth(name, room - this.font.width(ELLIPSIS))
 					+ ELLIPSIS;
 		}
 		return label.append(trimmed);
@@ -269,29 +264,29 @@ public class PreferredBiomesScreen extends Screen {
 	private void updateModTooltip() {
 		if (this.modButton != null) {
 			this.modButton.setTooltip(this.modFilter
-					.map(name -> Tooltip.of(Text.literal(name)))
+					.map(name -> Tooltip.create(Component.literal(name)))
 					.orElse(null));
 		}
 	}
 
-	private List<Text> tooltipLines(BiomeCatalog.Entry entry) {
-		List<Text> lines = new ArrayList<>();
-		lines.add(Text.literal(entry.modName()).formatted(Formatting.BOLD, Formatting.UNDERLINE));
-		lines.addAll(plantLines(entry.plants(), hasShiftDown()));
+	private List<Component> tooltipLines(BiomeCatalog.Entry entry) {
+		List<Component> lines = new ArrayList<>();
+		lines.add(Component.literal(entry.modName()).withStyle(ChatFormatting.BOLD, ChatFormatting.UNDERLINE));
+		lines.addAll(plantLines(entry.plants(), this.minecraft.hasShiftDown()));
 		return lines;
 	}
 
-	private List<Text> plantLines(List<String> plants, boolean expanded) {
-		List<Text> lines = new ArrayList<>();
+	private List<Component> plantLines(List<String> plants, boolean expanded) {
+		List<Component> lines = new ArrayList<>();
 		if (plants.isEmpty()) {
 			return lines;
 		}
 		if (!expanded && plants.size() > COLLAPSED) {
 			for (String plant : plants.subList(0, COLLAPSED)) {
-				lines.add(Text.literal(cell(plant)));
+				lines.add(Component.literal(cell(plant)));
 			}
-			lines.add(Text.literal(ELLIPSIS + " and " + (plants.size() - COLLAPSED)
-					+ " more (hold Shift)").formatted(Formatting.GRAY));
+			lines.add(Component.literal(ELLIPSIS + " and " + (plants.size() - COLLAPSED)
+					+ " more (hold Shift)").withStyle(ChatFormatting.GRAY));
 			return lines;
 		}
 		int rows = Math.min(plants.size(), ROWS_PER_COLUMN);
@@ -304,7 +299,7 @@ public class PreferredBiomesScreen extends Screen {
 			for (int r = 0; r < rows; r++) {
 				int i = c * rows + r;
 				if (i < shown) {
-					widest = Math.max(widest, this.textRenderer.getWidth(cell(plants.get(i))));
+					widest = Math.max(widest, this.font.width(cell(plants.get(i))));
 				}
 			}
 			start[c + 1] = start[c] + widest + GUTTER;
@@ -319,16 +314,16 @@ public class PreferredBiomesScreen extends Screen {
 				}
 				line.append(cell(plants.get(i)));
 				if (c < columns - 1 && i + rows < shown) {
-					while (this.textRenderer.getWidth(line.toString()) < start[c + 1]) {
+					while (this.font.width(line.toString()) < start[c + 1]) {
 						line.append(' ');
 					}
 				}
 			}
-			lines.add(Text.literal(line.toString()));
+			lines.add(Component.literal(line.toString()));
 		}
 		if (shown < plants.size()) {
-			lines.add(Text.literal(ELLIPSIS + " and " + (plants.size() - shown) + " more")
-					.formatted(Formatting.GRAY));
+			lines.add(Component.literal(ELLIPSIS + " and " + (plants.size() - shown) + " more")
+					.withStyle(ChatFormatting.GRAY));
 		}
 		return lines;
 	}
@@ -337,12 +332,12 @@ public class PreferredBiomesScreen extends Screen {
 		return "- " + plant;
 	}
 
-	private void drawPlantTooltip(DrawContext context, List<Text> lines, int mouseX, int mouseY) {
-		TextRenderer font = this.textRenderer;
-		int linePitch = font.fontHeight + 1;
+	private void drawPlantTooltip(GuiGraphics context, List<Component> lines, int mouseX, int mouseY) {
+		Font font = this.font;
+		int linePitch = font.lineHeight + 1;
 		int textW = 0;
-		for (Text line : lines) {
-			int w = font.getWidth(line);
+		for (Component line : lines) {
+			int w = font.width(line);
 			if (line.getStyle().isBold()) {
 				w += line.getString().length();
 			}
@@ -357,10 +352,9 @@ public class PreferredBiomesScreen extends Screen {
 		if (x + boxW + 1 > this.width) {
 			x = mouseX - 12 - boxW;
 		}
-		y = MathHelper.clamp(y, 4, Math.max(4, this.height - boxH - 4));
+		y = Mth.clamp(y, 4, Math.max(4, this.height - boxH - 4));
 
-		context.getMatrices().push();
-		context.getMatrices().translate(0.0F, 0.0F, 400.0F);
+		context.nextStratum();
 
 		int x1 = x - 1;
 		int y1 = y - 1;
@@ -374,8 +368,9 @@ public class PreferredBiomesScreen extends Screen {
 
 		int textX = x + TOOLTIP_PAD;
 		int textY = y + TOOLTIP_PAD;
-		for (Text line : lines) {
-			int end = context.drawTextWithShadow(font, line, textX, textY, 0xFFFFFF);
+		for (Component line : lines) {
+			context.drawString(font, line, textX, textY, 0xFFFFFFFF);
+			int end = textX + font.width(line) + 1;
 			if (end > textX + textW && !this.tooltipWidthWarned) {
 				this.tooltipWidthWarned = true;
 				PreferredBiomes.LOGGER.warn("tooltip line drew {} px past its measured width: {}",
@@ -383,7 +378,6 @@ public class PreferredBiomesScreen extends Screen {
 			}
 			textY += linePitch;
 		}
-		context.getMatrices().pop();
 	}
 
 	private static String key(String name) {
@@ -413,7 +407,7 @@ public class PreferredBiomesScreen extends Screen {
 		if (this.selectNone != null) {
 			this.selectNone.active = checklistLive;
 		}
-		for (CyclingButtonWidget<?> button : new CyclingButtonWidget<?>[] {
+		for (CycleButton<?> button : new CycleButton<?>[] {
 				this.sortButton, this.temperatureButton, this.humidityButton, this.modButton }) {
 			if (button != null) {
 				button.active = checklistLive;
@@ -438,52 +432,51 @@ public class PreferredBiomesScreen extends Screen {
 		int size = this.islandSize;
 		float frequency = this.islandFrequency;
 		int noise = this.islandNoise;
-		this.parent.getWorldCreator().applyModifier((registryManager, dimensions) -> {
+		this.parent.getUiState().updateDimensions((registryManager, dimensions) -> {
 			var settings = challenge
-					? RegistryEntry.of(
+					? Holder.direct(
 							IslandTerrain.createSettings(registryManager, size, frequency, noise))
-					: registryManager.get(RegistryKeys.CHUNK_GENERATOR_SETTINGS)
-							.entryOf(ChunkGeneratorSettings.OVERWORLD);
+					: registryManager.lookupOrThrow(Registries.NOISE_SETTINGS)
+							.getOrThrow(NoiseGeneratorSettings.OVERWORLD);
 			PreferredBiomeSource source;
 			if (challenge) {
-				var biomeLookup = registryManager.getWrapperOrThrow(RegistryKeys.BIOME);
-				List<RegistryEntry<Biome>> declared = List.of(
-						biomeLookup.getOrThrow(BiomeKeys.SNOWY_PLAINS),
-						biomeLookup.getOrThrow(BiomeKeys.SWAMP),
-						biomeLookup.getOrThrow(BiomeKeys.BEACH));
+				var biomeLookup = registryManager.lookupOrThrow(Registries.BIOME);
+				List<Holder<Biome>> declared = List.of(
+						biomeLookup.getOrThrow(Biomes.SNOWY_PLAINS),
+						biomeLookup.getOrThrow(Biomes.SWAMP),
+						biomeLookup.getOrThrow(Biomes.BEACH));
 				source = new PreferredBiomeSource(
 						Either.left(IslandBiomes.entries(biomeLookup)),
 						List.of(), true, size, frequency, noise, declared);
 			} else {
 				source = new PreferredBiomeSource(
 						Either.right(registryManager
-								.get(RegistryKeys.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
-								.entryOf(OVERWORLD_PARAMETERS)),
+								.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+								.getOrThrow(OVERWORLD_PARAMETERS)),
 						excluded, false, size, frequency);
 			}
-			return dimensions.with(registryManager, new NoiseChunkGenerator(source, settings));
+			return dimensions.replaceOverworldGenerator(registryManager, new NoiseBasedChunkGenerator(source, settings));
 		});
-		this.close();
+		this.onClose();
 	}
 
 	@Override
-	public void close() {
-		this.client.setScreen(this.parent);
+	public void onClose() {
+		this.minecraft.setScreen(this.parent);
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		this.renderBackground(context);
+	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 		this.list.render(context, mouseX, mouseY, delta);
-		context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, MARGIN, 0xFFFFFF);
-		context.drawCenteredTextWithShadow(this.textRenderer,
-				Text.translatable("preferred-biomes.screen.counter",
+		context.drawCenteredString(this.font, this.title, this.width / 2, MARGIN, 0xFFFFFFFF);
+		context.drawCenteredString(this.font,
+				Component.translatable("preferred-biomes.screen.counter",
 						this.selected.size(), this.catalog.size()),
-				this.width / 2, this.counterY, this.islandChallenge ? 0x606060 : 0xA0A0A0);
+				this.width / 2, this.counterY, this.islandChallenge ? 0xFF606060 : 0xFFA0A0A0);
 		if (this.islandChallenge) {
-			context.drawCenteredTextWithShadow(this.textRenderer,
-					Text.translatable("preferred-biomes.screen.challenge_note"),
-					this.width / 2, this.challengeNoteY, 0xA0A0A0);
+			context.drawCenteredString(this.font,
+					Component.translatable("preferred-biomes.screen.challenge_note"),
+					this.width / 2, this.challengeNoteY, 0xFFA0A0A0);
 		}
 		super.render(context, mouseX, mouseY, delta);
 		BiomeCatalog.Entry hovered = this.list.hoveredEntry();

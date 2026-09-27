@@ -1,18 +1,17 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.BiomeTags;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.BiomeKeys;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.structure.Structure;
-
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.BiomeTags;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.Structure;
 
 public final class StructureGate {
 
@@ -30,22 +29,22 @@ public final class StructureGate {
 			"mansion",
 			"mineshaft_mesa");
 
-	private static final Map<String, Predicate<RegistryEntry<Biome>>> REASSIGNED = Map.of(
-			"igloo", biome -> biome.matchesKey(BiomeKeys.FROZEN_OCEAN)
-					|| biome.matchesKey(BiomeKeys.DEEP_FROZEN_OCEAN),
-			"swamp_hut", biome -> biome.matchesKey(BiomeKeys.SPARSE_JUNGLE)
-					|| biome.matchesKey(BiomeKeys.BAMBOO_JUNGLE)
-					|| biome.matchesKey(IslandBiomes.MANGROVE_ISLAND),
+	private static final Map<String, Predicate<Holder<Biome>>> REASSIGNED = Map.of(
+			"igloo", biome -> biome.is(Biomes.FROZEN_OCEAN)
+					|| biome.is(Biomes.DEEP_FROZEN_OCEAN),
+			"swamp_hut", biome -> biome.is(Biomes.SPARSE_JUNGLE)
+					|| biome.is(Biomes.BAMBOO_JUNGLE)
+					|| biome.is(IslandBiomes.MANGROVE_ISLAND),
 			"buried_treasure", biome -> true,
-			"trail_ruins", biome -> biome.isIn(BiomeTags.IS_OCEAN));
+			"trail_ruins", biome -> biome.is(BiomeTags.IS_OCEAN));
 
 	public static boolean applies(ChunkGenerator generator) {
 		return generator.getBiomeSource() instanceof PreferredBiomeSource source
 				&& source.islandSurvivalChallenge();
 	}
 
-	public static String pathOf(DynamicRegistryManager registryManager, Structure structure) {
-		Identifier id = registryManager.get(RegistryKeys.STRUCTURE).getId(structure);
+	public static String pathOf(RegistryAccess registryManager, Structure structure) {
+		Identifier id = registryManager.lookupOrThrow(Registries.STRUCTURE).getKey(structure);
 		return id != null && Identifier.DEFAULT_NAMESPACE.equals(id.getNamespace())
 				? id.getPath()
 				: null;
@@ -69,9 +68,9 @@ public final class StructureGate {
 		return "trail_ruins".equals(path);
 	}
 
-	public static Predicate<RegistryEntry<Biome>> widen(String path,
-			Predicate<RegistryEntry<Biome>> original) {
-		Predicate<RegistryEntry<Biome>> extra = REASSIGNED.get(path);
+	public static Predicate<Holder<Biome>> widen(String path,
+			Predicate<Holder<Biome>> original) {
+		Predicate<Holder<Biome>> extra = REASSIGNED.get(path);
 		return extra == null ? original : original.or(extra);
 	}
 }

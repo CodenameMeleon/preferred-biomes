@@ -1,43 +1,43 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.noise.DoublePerlinNoiseSampler;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.StructureWorldAccess;
-import net.minecraft.world.gen.densityfunction.DensityFunction;
-import net.minecraft.world.gen.feature.ConfiguredFeature;
-import net.minecraft.world.gen.feature.DefaultFeatureConfig;
-import net.minecraft.world.gen.feature.Feature;
-import net.minecraft.world.gen.feature.util.FeatureContext;
-import net.minecraft.world.gen.noise.NoiseConfig;
-import net.minecraft.world.gen.noise.NoiseParametersKeys;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.Noises;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
+import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
-public class LushIslandPoolFeature extends Feature<DefaultFeatureConfig> {
+public class LushIslandPoolFeature extends Feature<NoneFeatureConfiguration> {
 
-	private static final RegistryKey<ConfiguredFeature<?, ?>> POOL = RegistryKey.of(
-			RegistryKeys.CONFIGURED_FEATURE,
-			new Identifier("preferred-biomes", "lush_island_clay_pool"));
+	private static final ResourceKey<ConfiguredFeature<?, ?>> POOL = ResourceKey.create(
+			Registries.CONFIGURED_FEATURE,
+			Identifier.fromNamespaceAndPath("preferred-biomes", "lush_island_clay_pool"));
 
-	public LushIslandPoolFeature(Codec<DefaultFeatureConfig> codec) {
+	public LushIslandPoolFeature(Codec<NoneFeatureConfiguration> codec) {
 		super(codec);
 	}
 
 	@Override
-	public boolean generate(FeatureContext<DefaultFeatureConfig> context) {
-		StructureWorldAccess world = context.getWorld();
-		if (!(world.toServerWorld().getChunkManager().getChunkGenerator().getBiomeSource()
+	public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
+		WorldGenLevel world = context.level();
+		if (!(world.getLevel().getChunkSource().getGenerator().getBiomeSource()
 				instanceof PreferredBiomeSource source)) {
 			return false;
 		}
-		NoiseConfig noiseConfig = world.toServerWorld().getChunkManager().getNoiseConfig();
+		RandomState noiseConfig = world.getLevel().getChunkSource().randomState();
 		IslandField field = field(noiseConfig, source);
 
-		BlockPos origin = context.getOrigin();
+		BlockPos origin = context.origin();
 		double g = field.cellSize();
 		int cx = (int) Math.floor(origin.getX() / g);
 		int cz = (int) Math.floor(origin.getZ() / g);
@@ -52,25 +52,25 @@ public class LushIslandPoolFeature extends Feature<DefaultFeatureConfig> {
 
 		int x = anchor.getX();
 		int z = anchor.getZ();
-		BlockPos pos = new BlockPos(x, world.getTopY(Heightmap.Type.WORLD_SURFACE_WG, x, z), z);
-		return world.getRegistryManager().get(RegistryKeys.CONFIGURED_FEATURE)
-				.getOrEmpty(POOL)
-				.map(pool -> pool.generate(world, context.getGenerator(), context.getRandom(), pos))
+		BlockPos pos = new BlockPos(x, world.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z), z);
+		return world.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE)
+				.getOptional(POOL)
+				.map(pool -> pool.place(world, context.chunkGenerator(), context.random(), pos))
 				.orElse(false);
 	}
 
-	private static IslandField field(NoiseConfig noiseConfig, PreferredBiomeSource source) {
+	private static IslandField field(RandomState noiseConfig, PreferredBiomeSource source) {
 		return new IslandField(source.islandSize(), source.islandFrequency(), source.islandNoise(),
 				IslandField.Channel.HEIGHT,
 				seeded(noiseConfig, IslandTerrain.ISLAND_JITTER),
 				seeded(noiseConfig, IslandTerrain.ISLAND_SHAPE),
-				seeded(noiseConfig, NoiseParametersKeys.OFFSET.getValue()),
-				seeded(noiseConfig, NoiseParametersKeys.TEMPERATURE.getValue()));
+				seeded(noiseConfig, Noises.SHIFT.identifier()),
+				seeded(noiseConfig, Noises.TEMPERATURE.identifier()));
 	}
 
-	private static DensityFunction.Noise seeded(NoiseConfig noiseConfig, Identifier id) {
-		RegistryKey<DoublePerlinNoiseSampler.NoiseParameters> key =
-				RegistryKey.of(RegistryKeys.NOISE_PARAMETERS, id);
-		return new DensityFunction.Noise(null, noiseConfig.getOrCreateSampler(key));
+	private static DensityFunction.NoiseHolder seeded(RandomState noiseConfig, Identifier id) {
+		ResourceKey<NormalNoise.NoiseParameters> key =
+				ResourceKey.create(Registries.NOISE, id);
+		return new DensityFunction.NoiseHolder(null, noiseConfig.getOrCreateNoise(key));
 	}
 }

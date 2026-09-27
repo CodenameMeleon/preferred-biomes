@@ -1,39 +1,41 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryEntryLookup;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.noise.DoublePerlinNoiseSampler;
-import net.minecraft.world.biome.source.util.VanillaTerrainParametersCreator;
-import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
-import net.minecraft.world.gen.densityfunction.DensityFunction;
-import net.minecraft.world.gen.densityfunction.DensityFunctionTypes;
-import net.minecraft.world.gen.noise.NoiseConfig;
-import net.minecraft.world.gen.noise.NoiseParametersKeys;
-import net.minecraft.world.gen.noise.NoiseRouter;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.data.worldgen.TerrainProvider;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.DensityFunctions;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.NoiseRouter;
+import net.minecraft.world.level.levelgen.NoiseSettings;
+import net.minecraft.world.level.levelgen.Noises;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 public final class IslandTerrain {
 
 	private IslandTerrain() {
 	}
 
-	private static final Identifier Y = new Identifier("y");
-	private static final Identifier CONTINENTS = new Identifier("overworld/continents");
-	private static final Identifier EROSION = new Identifier("overworld/erosion");
-	private static final Identifier RIDGES_FOLDED = new Identifier("overworld/ridges_folded");
-	private static final Identifier BASE_3D_NOISE = new Identifier("overworld/base_3d_noise");
-	private static final Identifier CAVES_ENTRANCES = new Identifier("overworld/caves/entrances");
-	private static final Identifier CAVES_NOODLE = new Identifier("overworld/caves/noodle");
-	private static final Identifier CAVES_PILLARS = new Identifier("overworld/caves/pillars");
-	private static final Identifier CAVES_SPAGHETTI_2D = new Identifier("overworld/caves/spaghetti_2d");
+	private static final Identifier Y = Identifier.parse("y");
+	private static final Identifier CONTINENTS = Identifier.parse("overworld/continents");
+	private static final Identifier EROSION = Identifier.parse("overworld/erosion");
+	private static final Identifier RIDGES_FOLDED = Identifier.parse("overworld/ridges_folded");
+	private static final Identifier BASE_3D_NOISE = Identifier.parse("overworld/base_3d_noise");
+	private static final Identifier CAVES_ENTRANCES = Identifier.parse("overworld/caves/entrances");
+	private static final Identifier CAVES_NOODLE = Identifier.parse("overworld/caves/noodle");
+	private static final Identifier CAVES_PILLARS = Identifier.parse("overworld/caves/pillars");
+	private static final Identifier CAVES_SPAGHETTI_2D = Identifier.parse("overworld/caves/spaghetti_2d");
 	private static final Identifier CAVES_SPAGHETTI_ROUGHNESS =
-			new Identifier("overworld/caves/spaghetti_roughness_function");
+			Identifier.parse("overworld/caves/spaghetti_roughness_function");
 
-	public static final Identifier ISLAND_JITTER = new Identifier("preferred-biomes", "island_jitter");
-	public static final Identifier ISLAND_SHAPE = new Identifier("preferred-biomes", "island_shape");
+	public static final Identifier ISLAND_JITTER = Identifier.fromNamespaceAndPath("preferred-biomes", "island_jitter");
+	public static final Identifier ISLAND_SHAPE = Identifier.fromNamespaceAndPath("preferred-biomes", "island_shape");
 
 
 	private static final double OCEAN_CONTINENTS = -0.2;
@@ -60,165 +62,170 @@ public final class IslandTerrain {
 
 	private static final double CARVE_CEILING = 50.0;
 
-	public static ChunkGeneratorSettings createSettings(DynamicRegistryManager registryManager,
+	public static NoiseGeneratorSettings createSettings(HolderLookup.Provider registryManager,
 			int size, float frequency, int noise) {
-		RegistryEntryLookup<DensityFunction> functions =
-				registryManager.getWrapperOrThrow(RegistryKeys.DENSITY_FUNCTION);
-		RegistryEntryLookup<DoublePerlinNoiseSampler.NoiseParameters> noises =
-				registryManager.getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS);
+		HolderGetter<DensityFunction> functions =
+				registryManager.lookupOrThrow(Registries.DENSITY_FUNCTION);
+		HolderGetter<NormalNoise.NoiseParameters> noises =
+				registryManager.lookupOrThrow(Registries.NOISE);
 
-		ChunkGeneratorSettings vanilla = registryManager.get(RegistryKeys.CHUNK_GENERATOR_SETTINGS)
-				.entryOf(ChunkGeneratorSettings.OVERWORLD).value();
+		NoiseGeneratorSettings vanilla = registryManager.lookupOrThrow(Registries.NOISE_SETTINGS)
+				.getOrThrow(NoiseGeneratorSettings.OVERWORLD).value();
 
-		return new ChunkGeneratorSettings(
-				vanilla.generationShapeConfig(),
+		return new NoiseGeneratorSettings(
+				vanilla.noiseSettings(),
 				vanilla.defaultBlock(),
 				vanilla.defaultFluid(),
-				createRouter(vanilla.noiseRouter(), functions, noises, size, frequency, noise),
+				createRouter(vanilla.noiseRouter(), vanilla.noiseSettings(), functions, noises, size,
+						frequency, noise),
 				IslandSurface.rule(vanilla.surfaceRule(), size, frequency, noise),
 				vanilla.spawnTarget(),
 				vanilla.seaLevel(),
-				vanilla.mobGenerationDisabled(),
-				vanilla.hasAquifers(),
-				vanilla.oreVeins(),
-				vanilla.usesLegacyRandom());
+				vanilla.disableMobGeneration(),
+				vanilla.isAquifersEnabled(),
+				vanilla.oreVeinsEnabled(),
+				vanilla.useLegacyRandomSource());
 	}
 
-	private static NoiseRouter createRouter(NoiseRouter vanilla,
-			RegistryEntryLookup<DensityFunction> functions,
-			RegistryEntryLookup<DoublePerlinNoiseSampler.NoiseParameters> noises,
+	private static NoiseRouter createRouter(NoiseRouter vanilla, NoiseSettings noiseSettings,
+			HolderGetter<DensityFunction> functions,
+			HolderGetter<NormalNoise.NoiseParameters> noises,
 			int size, float frequency, int noise) {
 
-		DensityFunction continents = DensityFunctionTypes.min(
-				DensityFunctionTypes.max(vanilla.continents(),
-						DensityFunctionTypes.constant(OCEAN_CONTINENTS_MIN)),
-				DensityFunctionTypes.constant(OCEAN_CONTINENTS));
+		DensityFunction continents = DensityFunctions.min(
+				DensityFunctions.max(vanilla.continents(),
+						DensityFunctions.constant(OCEAN_CONTINENTS_MIN)),
+				DensityFunctions.constant(OCEAN_CONTINENTS));
 
 		DensityFunction erosion = vanilla.erosion();
 		DensityFunction ridges = vanilla.ridges();
 		DensityFunction ridgesFolded = holder(functions, RIDGES_FOLDED);
 
-		DensityFunctionTypes.Spline.DensityFunctionWrapper wContinents = wrap(continents);
-		DensityFunctionTypes.Spline.DensityFunctionWrapper wErosion = wrap(erosion);
-		DensityFunctionTypes.Spline.DensityFunctionWrapper wRidges = wrap(ridges);
-		DensityFunctionTypes.Spline.DensityFunctionWrapper wRidgesFolded = wrap(ridgesFolded);
+		DensityFunctions.Spline.Coordinate wContinents = wrap(continents);
+		DensityFunctions.Spline.Coordinate wErosion = wrap(erosion);
+		DensityFunctions.Spline.Coordinate wRidges = wrap(ridges);
+		DensityFunctions.Spline.Coordinate wRidgesFolded = wrap(ridgesFolded);
 
-		DensityFunction islandHeight = DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(
+		DensityFunction islandHeight = DensityFunctions.flatCache(DensityFunctions.cache2d(
 				new IslandField(size, frequency, noise, IslandField.Channel.HEIGHT,
-						new DensityFunction.Noise(noise(noises, ISLAND_JITTER)),
-						new DensityFunction.Noise(noise(noises, ISLAND_SHAPE)),
-						new DensityFunction.Noise(noise(noises, NoiseParametersKeys.OFFSET)),
-						new DensityFunction.Noise(noise(noises, NoiseParametersKeys.TEMPERATURE)))));
+						new DensityFunction.NoiseHolder(noise(noises, ISLAND_JITTER)),
+						new DensityFunction.NoiseHolder(noise(noises, ISLAND_SHAPE)),
+						new DensityFunction.NoiseHolder(noise(noises, Noises.SHIFT)),
+						new DensityFunction.NoiseHolder(noise(noises, Noises.TEMPERATURE)))));
 
 		DensityFunction vanillaOffset = applyBlending(
 				offsetExpression(wContinents, wErosion, wRidgesFolded),
-				DensityFunctionTypes.blendOffset());
+				DensityFunctions.blendOffset());
 
-		DensityFunction oceanOffset = DensityFunctionTypes.add(vanillaOffset,
-				DensityFunctionTypes.constant(OCEAN_FLOOR_DROP / 128.0));
-		DensityFunction offset = DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(
-				DensityFunctionTypes.max(oceanOffset, islandHeight)));
+		DensityFunction oceanOffset = DensityFunctions.add(vanillaOffset,
+				DensityFunctions.constant(OCEAN_FLOOR_DROP / 128.0));
+		DensityFunction offset = DensityFunctions.flatCache(DensityFunctions.cache2d(
+				DensityFunctions.max(oceanOffset, islandHeight)));
 
-		DensityFunction mask = DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(
+		DensityFunction mask = DensityFunctions.flatCache(DensityFunctions.cache2d(
 				maskExpression(islandHeight, vanillaOffset)));
 
 		DensityFunction factor = applyBlending(
-				DensityFunctionTypes.spline(VanillaTerrainParametersCreator.createFactorSpline(
+				DensityFunctions.spline(TerrainProvider.overworldFactor(
 						wContinents, wErosion, wRidges, wRidgesFolded, false)),
-				DensityFunctionTypes.constant(10.0));
+				DensityFunctions.constant(10.0));
 		DensityFunction jaggedness = applyBlending(
-				DensityFunctionTypes.spline(VanillaTerrainParametersCreator.createJaggednessSpline(
+				DensityFunctions.spline(TerrainProvider.overworldJaggedness(
 						wContinents, wErosion, wRidges, wRidgesFolded, false)),
-				DensityFunctionTypes.zero());
-		DensityFunction depth = DensityFunctionTypes.add(
-				DensityFunctionTypes.yClampedGradient(-64, 320, 1.5, -1.5), offset);
+				DensityFunctions.zero());
+		DensityFunction depth = DensityFunctions.add(
+				DensityFunctions.yClampedGradient(-64, 320, 1.5, -1.5), offset);
 
-		DensityFunction jaggedNoise = DensityFunctionTypes.noise(
-				noise(noises, NoiseParametersKeys.JAGGED), 1500.0, 0.0);
-		DensityFunction depthPlusJag = DensityFunctionTypes.add(depth,
-				DensityFunctionTypes.mul(jaggedness, jaggedNoise.halfNegative()));
-		DensityFunction oneMinusMask = DensityFunctionTypes.add(DensityFunctionTypes.constant(1.0),
-				DensityFunctionTypes.mul(mask, DensityFunctionTypes.constant(-1.0)));
+		DensityFunction jaggedNoise = DensityFunctions.noise(
+				noise(noises, Noises.JAGGED), 1500.0, 0.0);
+		DensityFunction depthPlusJag = DensityFunctions.add(depth,
+				DensityFunctions.mul(jaggedness, jaggedNoise.halfNegative()));
+		DensityFunction oneMinusMask = DensityFunctions.add(DensityFunctions.constant(1.0),
+				DensityFunctions.mul(mask, DensityFunctions.constant(-1.0)));
 
 		DensityFunction vanillaTerm = createInitialDensityFunction(factor, depthPlusJag);
-		DensityFunction symmetric = DensityFunctionTypes.mul(DensityFunctionTypes.constant(4.0),
-				DensityFunctionTypes.mul(depthPlusJag, factor));
-		DensityFunction gradientTerm = DensityFunctionTypes.add(
-				DensityFunctionTypes.mul(vanillaTerm, oneMinusMask),
-				DensityFunctionTypes.mul(symmetric, mask));
+		DensityFunction symmetric = DensityFunctions.mul(DensityFunctions.constant(4.0),
+				DensityFunctions.mul(depthPlusJag, factor));
+		DensityFunction gradientTerm = DensityFunctions.add(
+				DensityFunctions.mul(vanillaTerm, oneMinusMask),
+				DensityFunctions.mul(symmetric, mask));
 
-		DensityFunction slopedCheese = DensityFunctionTypes.add(gradientTerm,
-				DensityFunctionTypes.mul(holder(functions, BASE_3D_NOISE),
-						DensityFunctionTypes.mul(oneMinusMask,
-								DensityFunctionTypes.constant(OCEAN_NOISE_SCALE))));
+		DensityFunction slopedCheese = DensityFunctions.add(gradientTerm,
+				DensityFunctions.mul(holder(functions, BASE_3D_NOISE),
+						DensityFunctions.mul(oneMinusMask,
+								DensityFunctions.constant(OCEAN_NOISE_SCALE))));
 
 		DensityFunction yFn = holder(functions, Y);
 		DensityFunction entrancesFn = holder(functions, CAVES_ENTRANCES);
-		DensityFunction scaledEntrances = DensityFunctionTypes.mul(
-				DensityFunctionTypes.constant(5.0), entrancesFn);
-		DensityFunction vanillaEntrances = DensityFunctionTypes.min(slopedCheese, scaledEntrances);
-		DensityFunction carveDeep = DensityFunctionTypes.rangeChoice(yFn, -1000000.0, CARVE_CEILING,
-				scaledEntrances, DensityFunctionTypes.constant(1000000.0));
-		DensityFunction islandEntrances = DensityFunctionTypes.min(slopedCheese, carveDeep);
-		DensityFunction entrances = DensityFunctionTypes.add(
-				DensityFunctionTypes.mul(vanillaEntrances, oneMinusMask),
-				DensityFunctionTypes.mul(islandEntrances, mask));
+		DensityFunction scaledEntrances = DensityFunctions.mul(
+				DensityFunctions.constant(5.0), entrancesFn);
+		DensityFunction vanillaEntrances = DensityFunctions.min(slopedCheese, scaledEntrances);
+		DensityFunction carveDeep = DensityFunctions.rangeChoice(yFn, -1000000.0, CARVE_CEILING,
+				scaledEntrances, DensityFunctions.constant(1000000.0));
+		DensityFunction islandEntrances = DensityFunctions.min(slopedCheese, carveDeep);
+		DensityFunction entrances = DensityFunctions.add(
+				DensityFunctions.mul(vanillaEntrances, oneMinusMask),
+				DensityFunctions.mul(islandEntrances, mask));
 
 		DensityFunction noodleFn = holder(functions, CAVES_NOODLE);
-		DensityFunction noodleDeep = DensityFunctionTypes.rangeChoice(yFn, -1000000.0, CARVE_CEILING,
-				noodleFn, DensityFunctionTypes.constant(1000000.0));
-		DensityFunction noodleTerm = DensityFunctionTypes.add(
-				DensityFunctionTypes.mul(noodleFn, oneMinusMask),
-				DensityFunctionTypes.mul(noodleDeep, mask));
+		DensityFunction noodleDeep = DensityFunctions.rangeChoice(yFn, -1000000.0, CARVE_CEILING,
+				noodleFn, DensityFunctions.constant(1000000.0));
+		DensityFunction noodleTerm = DensityFunctions.add(
+				DensityFunctions.mul(noodleFn, oneMinusMask),
+				DensityFunctions.mul(noodleDeep, mask));
 
-		DensityFunction withCaves = DensityFunctionTypes.rangeChoice(slopedCheese, -1000000.0, 1.5625,
+		DensityFunction withCaves = DensityFunctions.rangeChoice(slopedCheese, -1000000.0, 1.5625,
 				entrances, createCavesFunction(functions, noises, slopedCheese));
-		DensityFunction builtDensity = DensityFunctionTypes.min(
+		DensityFunction builtDensity = DensityFunctions.min(
 				applyBlendDensity(applySurfaceSlides(withCaves)), noodleTerm);
 
-		DensityFunction ceiling = DensityFunctionTypes.yClampedGradient(
+		DensityFunction ceiling = DensityFunctions.yClampedGradient(
 				OCEAN_CEILING_BOTTOM, OCEAN_CEILING_TOP, 1000.0, -1000.0);
-		DensityFunction oceanCapped = DensityFunctionTypes.min(builtDensity, ceiling);
-		DensityFunction finalDensity = DensityFunctionTypes.add(
-				DensityFunctionTypes.mul(builtDensity, mask),
-				DensityFunctionTypes.mul(oceanCapped, oneMinusMask));
+		DensityFunction oceanCapped = DensityFunctions.min(builtDensity, ceiling);
+		DensityFunction finalDensity = DensityFunctions.add(
+				DensityFunctions.mul(builtDensity, mask),
+				DensityFunctions.mul(oceanCapped, oneMinusMask));
 
 		DensityFunction initialAsBuilt = applySurfaceSlides(
-				DensityFunctionTypes.add(
-						createInitialDensityFunction(DensityFunctionTypes.cache2d(factor), depth),
-						DensityFunctionTypes.constant(-0.703125)).clamp(-64.0, 64.0));
-		DensityFunction idwCeiling = DensityFunctionTypes.yClampedGradient(
+				DensityFunctions.add(
+						createInitialDensityFunction(DensityFunctions.cache2d(factor), depth),
+						DensityFunctions.constant(-0.703125)).clamp(-64.0, 64.0));
+		DensityFunction idwCeiling = DensityFunctions.yClampedGradient(
 				IDW_CEILING_BOTTOM, IDW_CEILING_TOP, 1000.0, IDW_CEILING_VALUE);
-		DensityFunction idwCapped = DensityFunctionTypes.min(initialAsBuilt, idwCeiling);
-		DensityFunction initialDensityWithoutJaggedness = DensityFunctionTypes.add(
-				DensityFunctionTypes.mul(initialAsBuilt, mask),
-				DensityFunctionTypes.mul(idwCapped, oneMinusMask));
+		DensityFunction idwCapped = DensityFunctions.min(initialAsBuilt, idwCeiling);
+		DensityFunction initialDensityWithoutJaggedness = DensityFunctions.add(
+				DensityFunctions.mul(initialAsBuilt, mask),
+				DensityFunctions.mul(idwCapped, oneMinusMask));
+		DensityFunction preliminarySurfaceLevel = DensityFunctions.findTopSurface(
+				DensityFunctions.add(initialDensityWithoutJaggedness, DensityFunctions.constant(-0.390625)),
+				DensityFunctions.constant(noiseSettings.minY() + noiseSettings.height()),
+				noiseSettings.minY(), noiseSettings.getCellHeight());
 
-		DensityFunction climateC = DensityFunctionTypes.add(
-				DensityFunctionTypes.mul(offset, DensityFunctionTypes.constant(128.0 / C_SPAN)),
-				DensityFunctionTypes.constant((128.0 - 63.0) / C_SPAN)).clamp(-1.0, 1.0);
-		DensityFunction climateS = DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(
+		DensityFunction climateC = DensityFunctions.add(
+				DensityFunctions.mul(offset, DensityFunctions.constant(128.0 / C_SPAN)),
+				DensityFunctions.constant((128.0 - 63.0) / C_SPAN)).clamp(-1.0, 1.0);
+		DensityFunction climateS = DensityFunctions.flatCache(DensityFunctions.cache2d(
 				new IslandField(size, frequency, noise, IslandField.Channel.SIZE,
-						new DensityFunction.Noise(noise(noises, ISLAND_JITTER)),
-						new DensityFunction.Noise(noise(noises, ISLAND_SHAPE)),
-						new DensityFunction.Noise(noise(noises, NoiseParametersKeys.OFFSET)),
-						new DensityFunction.Noise(noise(noises, NoiseParametersKeys.TEMPERATURE)))));
+						new DensityFunction.NoiseHolder(noise(noises, ISLAND_JITTER)),
+						new DensityFunction.NoiseHolder(noise(noises, ISLAND_SHAPE)),
+						new DensityFunction.NoiseHolder(noise(noises, Noises.SHIFT)),
+						new DensityFunction.NoiseHolder(noise(noises, Noises.TEMPERATURE)))));
 		DensityFunction anchorTemperature = new IslandField(size, frequency, noise,
 				IslandField.Channel.ANCHOR_TEMPERATURE,
-				new DensityFunction.Noise(noise(noises, ISLAND_JITTER)),
-				new DensityFunction.Noise(noise(noises, ISLAND_SHAPE)),
-				new DensityFunction.Noise(noise(noises, NoiseParametersKeys.OFFSET)),
-				new DensityFunction.Noise(noise(noises, NoiseParametersKeys.TEMPERATURE)));
-		DensityFunction temperature = DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(
-				DensityFunctionTypes.rangeChoice(anchorTemperature, -2.0, 2.0,
+				new DensityFunction.NoiseHolder(noise(noises, ISLAND_JITTER)),
+				new DensityFunction.NoiseHolder(noise(noises, ISLAND_SHAPE)),
+				new DensityFunction.NoiseHolder(noise(noises, Noises.SHIFT)),
+				new DensityFunction.NoiseHolder(noise(noises, Noises.TEMPERATURE)));
+		DensityFunction temperature = DensityFunctions.flatCache(DensityFunctions.cache2d(
+				DensityFunctions.rangeChoice(anchorTemperature, -2.0, 2.0,
 						anchorTemperature, vanilla.temperature())));
 
-		DensityFunction climateW = DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(
+		DensityFunction climateW = DensityFunctions.flatCache(DensityFunctions.cache2d(
 				new IslandField(size, frequency, noise, IslandField.Channel.ROLL,
-						new DensityFunction.Noise(noise(noises, ISLAND_JITTER)),
-						new DensityFunction.Noise(noise(noises, ISLAND_SHAPE)),
-						new DensityFunction.Noise(noise(noises, NoiseParametersKeys.OFFSET)),
-						new DensityFunction.Noise(noise(noises, NoiseParametersKeys.TEMPERATURE)))));
+						new DensityFunction.NoiseHolder(noise(noises, ISLAND_JITTER)),
+						new DensityFunction.NoiseHolder(noise(noises, ISLAND_SHAPE)),
+						new DensityFunction.NoiseHolder(noise(noises, Noises.SHIFT)),
+						new DensityFunction.NoiseHolder(noise(noises, Noises.TEMPERATURE)))));
 
 		return new NoiseRouter(
 				vanilla.barrierNoise(),
@@ -231,7 +238,7 @@ public final class IslandTerrain {
 				climateS,
 				depth,
 				climateW,
-				initialDensityWithoutJaggedness,
+				preliminarySurfaceLevel,
 				finalDensity,
 				vanilla.veinToggle(),
 				vanilla.veinRidged(),
@@ -240,70 +247,70 @@ public final class IslandTerrain {
 
 
 	private static DensityFunction offsetExpression(
-			DensityFunctionTypes.Spline.DensityFunctionWrapper continents,
-			DensityFunctionTypes.Spline.DensityFunctionWrapper erosion,
-			DensityFunctionTypes.Spline.DensityFunctionWrapper ridgesFolded) {
-		return DensityFunctionTypes.add(DensityFunctionTypes.constant(-0.50375F),
-				DensityFunctionTypes.spline(VanillaTerrainParametersCreator.createOffsetSpline(
+			DensityFunctions.Spline.Coordinate continents,
+			DensityFunctions.Spline.Coordinate erosion,
+			DensityFunctions.Spline.Coordinate ridgesFolded) {
+		return DensityFunctions.add(DensityFunctions.constant(-0.50375F),
+				DensityFunctions.spline(TerrainProvider.overworldOffset(
 						continents, erosion, ridgesFolded, false)));
 	}
 
 	private static DensityFunction maskExpression(DensityFunction islandHeight,
 			DensityFunction vanillaOffset) {
-		return DensityFunctionTypes.mul(
-				DensityFunctionTypes.add(islandHeight,
-						DensityFunctionTypes.mul(vanillaOffset, DensityFunctionTypes.constant(-1.0))),
-				DensityFunctionTypes.constant(128.0 / MASK_BLOCKS))
+		return DensityFunctions.mul(
+				DensityFunctions.add(islandHeight,
+						DensityFunctions.mul(vanillaOffset, DensityFunctions.constant(-1.0))),
+				DensityFunctions.constant(128.0 / MASK_BLOCKS))
 				.clamp(0.0, 1.0);
 	}
 
 
-	public static IslandField seededField(DynamicRegistryManager registryManager,
-			NoiseConfig noiseConfig, int size, float frequency, int noise,
+	public static IslandField seededField(RegistryAccess registryManager,
+			RandomState noiseConfig, int size, float frequency, int noise,
 			IslandField.Channel channel) {
 		return new IslandField(size, frequency, noise, channel,
 				seededNoise(registryManager, noiseConfig, ISLAND_JITTER),
 				seededNoise(registryManager, noiseConfig, ISLAND_SHAPE),
-				seededNoise(registryManager, noiseConfig, NoiseParametersKeys.OFFSET.getValue()),
-				seededNoise(registryManager, noiseConfig, NoiseParametersKeys.TEMPERATURE.getValue()));
+				seededNoise(registryManager, noiseConfig, Noises.SHIFT.identifier()),
+				seededNoise(registryManager, noiseConfig, Noises.TEMPERATURE.identifier()));
 	}
 
-	private static DensityFunction.Noise seededNoise(DynamicRegistryManager registryManager,
-			NoiseConfig noiseConfig, Identifier id) {
-		RegistryKey<DoublePerlinNoiseSampler.NoiseParameters> key =
-				RegistryKey.of(RegistryKeys.NOISE_PARAMETERS, id);
-		return new DensityFunction.Noise(
-				registryManager.get(RegistryKeys.NOISE_PARAMETERS).entryOf(key),
-				noiseConfig.getOrCreateSampler(key));
+	private static DensityFunction.NoiseHolder seededNoise(RegistryAccess registryManager,
+			RandomState noiseConfig, Identifier id) {
+		ResourceKey<NormalNoise.NoiseParameters> key =
+				ResourceKey.create(Registries.NOISE, id);
+		return new DensityFunction.NoiseHolder(
+				registryManager.lookupOrThrow(Registries.NOISE).getOrThrow(key),
+				noiseConfig.getOrCreateNoise(key));
 	}
 
-	public static DensityFunction seededVanillaOffset(DynamicRegistryManager registryManager,
-			NoiseConfig noiseConfig) {
-		RegistryEntryLookup<DensityFunction> functions =
-				registryManager.getWrapperOrThrow(RegistryKeys.DENSITY_FUNCTION);
-		DensityFunction continents = DensityFunctionTypes.min(
-				DensityFunctionTypes.max(holder(functions, CONTINENTS),
-						DensityFunctionTypes.constant(OCEAN_CONTINENTS_MIN)),
-				DensityFunctionTypes.constant(OCEAN_CONTINENTS));
+	public static DensityFunction seededVanillaOffset(RegistryAccess registryManager,
+			RandomState noiseConfig) {
+		HolderGetter<DensityFunction> functions =
+				registryManager.lookupOrThrow(Registries.DENSITY_FUNCTION);
+		DensityFunction continents = DensityFunctions.min(
+				DensityFunctions.max(holder(functions, CONTINENTS),
+						DensityFunctions.constant(OCEAN_CONTINENTS_MIN)),
+				DensityFunctions.constant(OCEAN_CONTINENTS));
 		DensityFunction expression = offsetExpression(
 				wrap(continents), wrap(holder(functions, EROSION)), wrap(holder(functions, RIDGES_FOLDED)));
-		return expression.apply(seedVisitor(noiseConfig));
+		return expression.mapAll(seedVisitor(noiseConfig));
 	}
 
-	public static DensityFunction seededMask(DynamicRegistryManager registryManager,
-			NoiseConfig noiseConfig, int size, float frequency, int noise) {
+	public static DensityFunction seededMask(RegistryAccess registryManager,
+			RandomState noiseConfig, int size, float frequency, int noise) {
 		return maskExpression(
 				seededField(registryManager, noiseConfig, size, frequency, noise,
 						IslandField.Channel.HEIGHT),
 				seededVanillaOffset(registryManager, noiseConfig));
 	}
 
-	private static DensityFunction.DensityFunctionVisitor seedVisitor(NoiseConfig noiseConfig) {
-		return new DensityFunction.DensityFunctionVisitor() {
+	private static DensityFunction.Visitor seedVisitor(RandomState noiseConfig) {
+		return new DensityFunction.Visitor() {
 			@Override
-			public DensityFunction.Noise apply(DensityFunction.Noise noise) {
-				return new DensityFunction.Noise(noise.noiseData(),
-						noiseConfig.getOrCreateSampler(noise.noiseData().getKey().orElseThrow()));
+			public DensityFunction.NoiseHolder visitNoise(DensityFunction.NoiseHolder noise) {
+				return new DensityFunction.NoiseHolder(noise.noiseData(),
+						noiseConfig.getOrCreateNoise(noise.noiseData().unwrapKey().orElseThrow()));
 			}
 
 			@Override
@@ -314,46 +321,46 @@ public final class IslandTerrain {
 	}
 
 
-	private static DensityFunction holder(RegistryEntryLookup<DensityFunction> functions, Identifier id) {
-		return new DensityFunctionTypes.RegistryEntryHolder(
-				functions.getOrThrow(RegistryKey.of(RegistryKeys.DENSITY_FUNCTION, id)));
+	private static DensityFunction holder(HolderGetter<DensityFunction> functions, Identifier id) {
+		return new DensityFunctions.HolderHolder(
+				functions.getOrThrow(ResourceKey.create(Registries.DENSITY_FUNCTION, id)));
 	}
 
-	private static DensityFunctionTypes.Spline.DensityFunctionWrapper wrap(DensityFunction function) {
-		RegistryEntry<DensityFunction> entry =
-				function instanceof DensityFunctionTypes.RegistryEntryHolder holder
+	private static DensityFunctions.Spline.Coordinate wrap(DensityFunction function) {
+		Holder<DensityFunction> entry =
+				function instanceof DensityFunctions.HolderHolder holder
 						? holder.function()
-						: new RegistryEntry.Direct<>(function);
-		return new DensityFunctionTypes.Spline.DensityFunctionWrapper(entry);
+						: new Holder.Direct<>(function);
+		return new DensityFunctions.Spline.Coordinate(entry);
 	}
 
-	private static RegistryEntry<DoublePerlinNoiseSampler.NoiseParameters> noise(
-			RegistryEntryLookup<DoublePerlinNoiseSampler.NoiseParameters> noises,
-			RegistryKey<DoublePerlinNoiseSampler.NoiseParameters> key) {
+	private static Holder<NormalNoise.NoiseParameters> noise(
+			HolderGetter<NormalNoise.NoiseParameters> noises,
+			ResourceKey<NormalNoise.NoiseParameters> key) {
 		return noises.getOrThrow(key);
 	}
 
-	private static RegistryEntry<DoublePerlinNoiseSampler.NoiseParameters> noise(
-			RegistryEntryLookup<DoublePerlinNoiseSampler.NoiseParameters> noises, Identifier id) {
-		return noises.getOrThrow(RegistryKey.of(RegistryKeys.NOISE_PARAMETERS, id));
+	private static Holder<NormalNoise.NoiseParameters> noise(
+			HolderGetter<NormalNoise.NoiseParameters> noises, Identifier id) {
+		return noises.getOrThrow(ResourceKey.create(Registries.NOISE, id));
 	}
 
 
 	private static DensityFunction applyBlending(DensityFunction function, DensityFunction blendOffset) {
-		DensityFunction densityFunction = DensityFunctionTypes.lerp(
-				DensityFunctionTypes.blendAlpha(), blendOffset, function);
-		return DensityFunctionTypes.flatCache(DensityFunctionTypes.cache2d(densityFunction));
+		DensityFunction densityFunction = DensityFunctions.lerp(
+				DensityFunctions.blendAlpha(), blendOffset, function);
+		return DensityFunctions.flatCache(DensityFunctions.cache2d(densityFunction));
 	}
 
 	private static DensityFunction createInitialDensityFunction(DensityFunction factor, DensityFunction depth) {
-		DensityFunction densityFunction = DensityFunctionTypes.mul(depth, factor);
-		return DensityFunctionTypes.mul(DensityFunctionTypes.constant(4.0), densityFunction.quarterNegative());
+		DensityFunction densityFunction = DensityFunctions.mul(depth, factor);
+		return DensityFunctions.mul(DensityFunctions.constant(4.0), densityFunction.quarterNegative());
 	}
 
 	private static DensityFunction applyBlendDensity(DensityFunction density) {
-		DensityFunction densityFunction = DensityFunctionTypes.blendDensity(density);
-		return DensityFunctionTypes.mul(DensityFunctionTypes.interpolated(densityFunction),
-				DensityFunctionTypes.constant(0.64)).squeeze();
+		DensityFunction densityFunction = DensityFunctions.blendDensity(density);
+		return DensityFunctions.mul(DensityFunctions.interpolated(densityFunction),
+				DensityFunctions.constant(0.64)).squeeze();
 	}
 
 	private static DensityFunction applySurfaceSlides(DensityFunction density) {
@@ -364,36 +371,36 @@ public final class IslandTerrain {
 			int topRelativeMinY, int topRelativeMaxY, double topDensity,
 			int bottomRelativeMinY, int bottomRelativeMaxY, double bottomDensity) {
 		DensityFunction densityFunction = density;
-		DensityFunction densityFunction2 = DensityFunctionTypes.yClampedGradient(
+		DensityFunction densityFunction2 = DensityFunctions.yClampedGradient(
 				minY + maxY - topRelativeMinY, minY + maxY - topRelativeMaxY, 1.0, 0.0);
-		densityFunction = DensityFunctionTypes.lerp(densityFunction2, topDensity, densityFunction);
-		DensityFunction densityFunction3 = DensityFunctionTypes.yClampedGradient(
+		densityFunction = DensityFunctions.lerp(densityFunction2, topDensity, densityFunction);
+		DensityFunction densityFunction3 = DensityFunctions.yClampedGradient(
 				minY + bottomRelativeMinY, minY + bottomRelativeMaxY, 0.0, 1.0);
-		return DensityFunctionTypes.lerp(densityFunction3, bottomDensity, densityFunction);
+		return DensityFunctions.lerp(densityFunction3, bottomDensity, densityFunction);
 	}
 
-	private static DensityFunction createCavesFunction(RegistryEntryLookup<DensityFunction> functions,
-			RegistryEntryLookup<DoublePerlinNoiseSampler.NoiseParameters> noises,
+	private static DensityFunction createCavesFunction(HolderGetter<DensityFunction> functions,
+			HolderGetter<NormalNoise.NoiseParameters> noises,
 			DensityFunction slopedCheese) {
 		DensityFunction densityFunction = holder(functions, CAVES_SPAGHETTI_2D);
 		DensityFunction densityFunction2 = holder(functions, CAVES_SPAGHETTI_ROUGHNESS);
-		DensityFunction densityFunction3 = DensityFunctionTypes.noise(
-				noise(noises, NoiseParametersKeys.CAVE_LAYER), 8.0);
-		DensityFunction densityFunction4 = DensityFunctionTypes.mul(
-				DensityFunctionTypes.constant(4.0), densityFunction3.square());
-		DensityFunction densityFunction5 = DensityFunctionTypes.noise(
-				noise(noises, NoiseParametersKeys.CAVE_CHEESE), 0.6666666666666666);
-		DensityFunction densityFunction6 = DensityFunctionTypes.add(
-				DensityFunctionTypes.add(DensityFunctionTypes.constant(0.27), densityFunction5).clamp(-1.0, 1.0),
-				DensityFunctionTypes.add(DensityFunctionTypes.constant(1.5),
-						DensityFunctionTypes.mul(DensityFunctionTypes.constant(-0.64), slopedCheese)).clamp(0.0, 0.5));
-		DensityFunction densityFunction7 = DensityFunctionTypes.add(densityFunction4, densityFunction6);
-		DensityFunction densityFunction8 = DensityFunctionTypes.min(
-				DensityFunctionTypes.min(densityFunction7, holder(functions, CAVES_ENTRANCES)),
-				DensityFunctionTypes.add(densityFunction, densityFunction2));
+		DensityFunction densityFunction3 = DensityFunctions.noise(
+				noise(noises, Noises.CAVE_LAYER), 8.0);
+		DensityFunction densityFunction4 = DensityFunctions.mul(
+				DensityFunctions.constant(4.0), densityFunction3.square());
+		DensityFunction densityFunction5 = DensityFunctions.noise(
+				noise(noises, Noises.CAVE_CHEESE), 0.6666666666666666);
+		DensityFunction densityFunction6 = DensityFunctions.add(
+				DensityFunctions.add(DensityFunctions.constant(0.27), densityFunction5).clamp(-1.0, 1.0),
+				DensityFunctions.add(DensityFunctions.constant(1.5),
+						DensityFunctions.mul(DensityFunctions.constant(-0.64), slopedCheese)).clamp(0.0, 0.5));
+		DensityFunction densityFunction7 = DensityFunctions.add(densityFunction4, densityFunction6);
+		DensityFunction densityFunction8 = DensityFunctions.min(
+				DensityFunctions.min(densityFunction7, holder(functions, CAVES_ENTRANCES)),
+				DensityFunctions.add(densityFunction, densityFunction2));
 		DensityFunction densityFunction9 = holder(functions, CAVES_PILLARS);
-		DensityFunction densityFunction10 = DensityFunctionTypes.rangeChoice(
-				densityFunction9, -1000000.0, 0.03, DensityFunctionTypes.constant(-1000000.0), densityFunction9);
-		return DensityFunctionTypes.max(densityFunction8, densityFunction10);
+		DensityFunction densityFunction10 = DensityFunctions.rangeChoice(
+				densityFunction9, -1000000.0, 0.03, DensityFunctions.constant(-1000000.0), densityFunction9);
+		return DensityFunctions.max(densityFunction8, densityFunction10);
 	}
 }

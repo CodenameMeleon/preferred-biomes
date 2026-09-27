@@ -6,32 +6,31 @@ import com.google.gson.JsonPrimitive;
 import com.mojang.serialization.JsonOps;
 import net.codenamemeleon.preferredbiomes.client.mixin.BiomeWeatherAccessor;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.block.AttachedStemBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.CropBlock;
-import net.minecraft.block.FlowerBlock;
-import net.minecraft.block.PropaguleBlock;
-import net.minecraft.block.SaplingBlock;
-import net.minecraft.block.StemBlock;
-import net.minecraft.block.TallFlowerBlock;
-import net.minecraft.client.resource.language.I18n;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryOps;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.entry.RegistryEntryList;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.source.MultiNoiseBiomeSourceParameterList;
-import net.minecraft.world.gen.feature.ConfiguredFeature;
-import net.minecraft.world.gen.feature.PlacedFeature;
-
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList;
+import net.minecraft.world.level.block.AttachedStemBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.FlowerBlock;
+import net.minecraft.world.level.block.MangrovePropaguleBlock;
+import net.minecraft.world.level.block.SaplingBlock;
+import net.minecraft.world.level.block.StemBlock;
+import net.minecraft.world.level.block.TallFlowerBlock;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -86,34 +85,34 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 		return downfall < MODERATE_MAX ? Humidity.MODERATE : Humidity.HUMID;
 	}
 
-	private static final Identifier OVERWORLD_PARAMETERS = new Identifier("overworld");
-	private static final Identifier IS_OVERWORLD = new Identifier("is_overworld");
+	private static final Identifier OVERWORLD_PARAMETERS = Identifier.parse("overworld");
+	private static final Identifier IS_OVERWORLD = Identifier.parse("is_overworld");
 
-	public static BiomeCatalog build(DynamicRegistryManager registryManager) {
-		Registry<Biome> biomes = registryManager.get(RegistryKeys.BIOME);
+	public static BiomeCatalog build(RegistryAccess registryManager) {
+		Registry<Biome> biomes = registryManager.lookupOrThrow(Registries.BIOME);
 		Set<Identifier> ids = new LinkedHashSet<>();
 
 		Registry<MultiNoiseBiomeSourceParameterList> parameterLists =
-				registryManager.get(RegistryKeys.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST);
-		MultiNoiseBiomeSourceParameterList overworld = parameterLists.get(
-				RegistryKey.of(RegistryKeys.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST, OVERWORLD_PARAMETERS));
+				registryManager.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST);
+		MultiNoiseBiomeSourceParameterList overworld = parameterLists.getValue(
+				ResourceKey.create(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST, OVERWORLD_PARAMETERS));
 		if (overworld != null) {
-			overworld.getEntries().getEntries().forEach(pair ->
-					pair.getSecond().getKey().ifPresent(key -> ids.add(key.getValue())));
+			overworld.parameters().values().forEach(pair ->
+					pair.getSecond().unwrapKey().ifPresent(key -> ids.add(key.identifier())));
 		}
 
-		TagKey<Biome> isOverworld = TagKey.of(RegistryKeys.BIOME, IS_OVERWORLD);
-		for (RegistryEntry.Reference<Biome> entry : biomes.streamEntries().toList()) {
-			if (entry.isIn(isOverworld)) {
-				ids.add(entry.registryKey().getValue());
+		TagKey<Biome> isOverworld = TagKey.create(Registries.BIOME, IS_OVERWORLD);
+		for (Holder.Reference<Biome> entry : biomes.listElements().toList()) {
+			if (entry.is(isOverworld)) {
+				ids.add(entry.key().identifier());
 			}
 		}
 
 		PlantScanner scanner = new PlantScanner(registryManager);
 		List<Entry> catalog = new ArrayList<>(ids.size());
 		for (Identifier id : ids) {
-			Biome biome = biomes.get(id);
-			float temperature = biome == null ? 0.0F : biome.getTemperature();
+			Biome biome = biomes.getValue(id);
+			float temperature = biome == null ? 0.0F : biome.getBaseTemperature();
 			float downfall = biome == null ? 0.0F
 					: ((BiomeWeatherAccessor) (Object) biome).getWeather().downfall();
 			List<String> plants = biome == null ? List.of() : scanner.plantsOf(biome);
@@ -130,8 +129,8 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 	}
 
 	private static String displayNameOf(Identifier id) {
-		String key = id.toTranslationKey("biome");
-		return I18n.hasTranslation(key) ? I18n.translate(key) : id.toString();
+		String key = id.toLanguageKey("biome");
+		return I18n.exists(key) ? I18n.get(key) : id.toString();
 	}
 
 	public int size() {
@@ -146,24 +145,24 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 		private final Map<Identifier, List<Block>> byConfiguredId = new HashMap<>();
 		private final Map<Identifier, List<Block>> byPlacedId = new HashMap<>();
 
-		PlantScanner(DynamicRegistryManager registryManager) {
-			this.ops = RegistryOps.of(JsonOps.INSTANCE, registryManager);
-			this.configured = registryManager.get(RegistryKeys.CONFIGURED_FEATURE);
-			this.placed = registryManager.get(RegistryKeys.PLACED_FEATURE);
+		PlantScanner(RegistryAccess registryManager) {
+			this.ops = RegistryOps.create(JsonOps.INSTANCE, registryManager);
+			this.configured = registryManager.lookupOrThrow(Registries.CONFIGURED_FEATURE);
+			this.placed = registryManager.lookupOrThrow(Registries.PLACED_FEATURE);
 		}
 
 		List<String> plantsOf(Biome biome) {
 			Set<Block> blocks = new LinkedHashSet<>();
-			for (RegistryEntryList<PlacedFeature> step : biome.getGenerationSettings().getFeatures()) {
-				for (RegistryEntry<PlacedFeature> entry : step) {
+			for (HolderSet<PlacedFeature> step : biome.getGenerationSettings().features()) {
+				for (Holder<PlacedFeature> entry : step) {
 					blocks.addAll(blocksOf(entry));
 				}
 			}
 			return name(blocks);
 		}
 
-		private List<Block> blocksOf(RegistryEntry<PlacedFeature> entry) {
-			Identifier id = entry.getKey().map(RegistryKey::getValue).orElse(null);
+		private List<Block> blocksOf(Holder<PlacedFeature> entry) {
+			Identifier id = entry.unwrapKey().map(ResourceKey::identifier).orElse(null);
 			if (id != null) {
 				return placedById(id);
 			}
@@ -178,7 +177,7 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 				return cached;
 			}
 			this.byPlacedId.put(id, List.of());
-			PlacedFeature feature = this.placed.get(id);
+			PlacedFeature feature = this.placed.getValue(id);
 			if (feature == null) {
 				return List.of();
 			}
@@ -195,19 +194,19 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 				return cached;
 			}
 			this.byConfiguredId.put(id, List.of());
-			ConfiguredFeature<?, ?> feature = this.configured.get(id);
+			ConfiguredFeature<?, ?> feature = this.configured.getValue(id);
 			if (feature == null) {
 				return List.of();
 			}
 			Set<Block> out = new LinkedHashSet<>();
-			walk(ConfiguredFeature.CODEC.encodeStart(this.ops, feature).result().orElse(null), out);
+			walk(ConfiguredFeature.DIRECT_CODEC.encodeStart(this.ops, feature).result().orElse(null), out);
 			List<Block> blocks = List.copyOf(out);
 			this.byConfiguredId.put(id, blocks);
 			return blocks;
 		}
 
 		private JsonElement encodePlaced(PlacedFeature feature) {
-			return PlacedFeature.CODEC.encodeStart(this.ops, feature).result().orElse(null);
+			return PlacedFeature.DIRECT_CODEC.encodeStart(this.ops, feature).result().orElse(null);
 		}
 
 		private void walk(JsonElement json, Set<Block> out) {
@@ -245,20 +244,20 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 			if (id == null) {
 				return;
 			}
-			if (this.configured.containsId(id)) {
+			if (this.configured.containsKey(id)) {
 				out.addAll(configuredById(id));
 			}
-			if (this.placed.containsId(id)) {
+			if (this.placed.containsKey(id)) {
 				out.addAll(placedById(id));
 			}
 		}
 
 		private static boolean block(String text, Set<Block> out) {
 			Identifier id = Identifier.tryParse(text);
-			if (id == null || !Registries.BLOCK.containsId(id)) {
+			if (id == null || !BuiltInRegistries.BLOCK.containsKey(id)) {
 				return false;
 			}
-			out.add(Registries.BLOCK.get(id));
+			out.add(BuiltInRegistries.BLOCK.getValue(id));
 			return true;
 		}
 
@@ -275,23 +274,23 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 		}
 
 		private static boolean isSapling(Block block) {
-			if (block.getDefaultState().isIn(BlockTags.SAPLINGS)) {
+			if (block.defaultBlockState().is(BlockTags.SAPLINGS)) {
 				return true;
 			}
-			if (block instanceof SaplingBlock || block instanceof PropaguleBlock) {
+			if (block instanceof SaplingBlock || block instanceof MangrovePropaguleBlock) {
 				return true;
 			}
-			String path = Registries.BLOCK.getId(block).getPath();
+			String path = BuiltInRegistries.BLOCK.getKey(block).getPath();
 			return path.endsWith("_sapling") || path.endsWith("_propagule");
 		}
 
 		private static boolean isFlower(Block block) {
-			return block.getDefaultState().isIn(BlockTags.FLOWERS)
+			return block.defaultBlockState().is(BlockTags.FLOWERS)
 					|| block instanceof FlowerBlock || block instanceof TallFlowerBlock;
 		}
 
 		private static boolean isCrop(Block block) {
-			return block.getDefaultState().isIn(BlockTags.CROPS)
+			return block.defaultBlockState().is(BlockTags.CROPS)
 					|| block instanceof CropBlock || block instanceof StemBlock
 					|| block instanceof AttachedStemBlock;
 		}
@@ -307,12 +306,12 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 		}
 
 		private static String plantName(Block block) {
-			String key = block.getTranslationKey();
-			String name = Text.translatable(key).getString();
+			String key = block.getDescriptionId();
+			String name = Component.translatable(key).getString();
 			if (!name.equals(key)) {
 				return name;
 			}
-			String path = Registries.BLOCK.getId(block).getPath();
+			String path = BuiltInRegistries.BLOCK.getKey(block).getPath();
 			StringBuilder out = new StringBuilder();
 			for (String word : path.split("_")) {
 				if (word.isEmpty()) {

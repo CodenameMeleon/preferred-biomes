@@ -1,29 +1,23 @@
 {
-  "carvers": {
-    "air": [
-      "minecraft:cave",
-      "minecraft:cave_extra_underground",
-      "minecraft:canyon"
-    ]
+  "attributes": {
+    "minecraft:audio/background_music": {
+      "default": {
+        "max_delay": 24000,
+        "min_delay": 12000,
+        "sound": "minecraft:music.overworld.desert"
+      }
+    },
+    "minecraft:gameplay/snow_golem_melts": true,
+    "minecraft:visual/sky_color": "#6eb1ff"
   },
+  "carvers": [
+    "minecraft:cave",
+    "minecraft:cave_extra_underground",
+    "minecraft:canyon"
+  ],
   "downfall": 0.0,
   "effects": {
-    "fog_color": 12638463,
-    "mood_sound": {
-      "block_search_extent": 8,
-      "offset": 2.0,
-      "sound": "minecraft:ambient.cave",
-      "tick_delay": 6000
-    },
-    "music": {
-      "max_delay": 24000,
-      "min_delay": 12000,
-      "replace_current_music": false,
-      "sound": "minecraft:music.overworld.desert"
-    },
-    "sky_color": 7254527,
-    "water_color": 4159204,
-    "water_fog_color": 329011
+    "water_color": "#3f76e4"
   },
   "features": [
     [],
@@ -64,6 +58,7 @@
       "minecraft:ore_redstone",
       "minecraft:ore_redstone_lower",
       "minecraft:ore_diamond",
+      "minecraft:ore_diamond_medium",
       "minecraft:ore_diamond_large",
       "minecraft:ore_diamond_buried",
       "minecraft:ore_lapis",
@@ -83,6 +78,7 @@
       "minecraft:glow_lichen",
       "minecraft:flower_default",
       "minecraft:patch_grass_badlands",
+      "minecraft:patch_dry_grass_desert",
       "minecraft:patch_dead_bush_2",
       "minecraft:brown_mushroom_normal",
       "minecraft:red_mushroom_normal",
@@ -111,13 +107,13 @@
         "type": "minecraft:rabbit",
         "maxCount": 3,
         "minCount": 2,
-        "weight": 4
+        "weight": 12
       },
       {
-        "maxCount": 3,
-        "minCount": 2,
         "type": "minecraft:camel",
-        "weight": 4
+        "maxCount": 1,
+        "minCount": 1,
+        "weight": 1
       }
     ],
     "misc": [],
@@ -144,7 +140,7 @@
         "type": "minecraft:skeleton",
         "maxCount": 4,
         "minCount": 4,
-        "weight": 100
+        "weight": 50
       },
       {
         "type": "minecraft:creeper",
@@ -175,6 +171,12 @@
         "maxCount": 4,
         "minCount": 4,
         "weight": 80
+      },
+      {
+        "type": "minecraft:parched",
+        "maxCount": 4,
+        "minCount": 4,
+        "weight": 50
       }
     ],
     "underground_water_creature": [

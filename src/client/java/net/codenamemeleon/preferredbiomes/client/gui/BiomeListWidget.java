@@ -1,14 +1,5 @@
 package net.codenamemeleon.preferredbiomes.client.gui;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.widget.ElementListWidget;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -16,8 +7,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.ContainerObjectSelectionList;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
-public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractEntry> {
+public class BiomeListWidget extends ContainerObjectSelectionList<BiomeListWidget.AbstractEntry> {
 
 	public enum Sort {
 		BY_MOD, A_TO_Z, Z_TO_A
@@ -45,9 +46,9 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 	private boolean enabled = true;
 	private BiomeCatalog.Entry hovered;
 
-	public BiomeListWidget(MinecraftClient client, int width, int top, int bottom,
+	public BiomeListWidget(Minecraft client, int width, int top, int bottom,
 			BiomeCatalog catalog, Set<Identifier> selected, Runnable onChanged) {
-		super(client, width, bottom - top, top, bottom, 14);
+		super(client, width, bottom - top, top, 14);
 		this.catalog = catalog;
 		this.selected = selected;
 		this.onChanged = onChanged;
@@ -63,9 +64,9 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+	public void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
 		this.hovered = null;
-		super.render(context, mouseX, mouseY, delta);
+		super.renderWidget(context, mouseX, mouseY, delta);
 	}
 
 	public BiomeCatalog.Entry hoveredEntry() {
@@ -78,7 +79,7 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 	}
 
 	@Override
-	protected int getScrollbarPositionX() {
+	protected int scrollBarX() {
 		return this.width / 2 + getRowWidth() / 2 + 4;
 	}
 
@@ -218,28 +219,29 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 	}
 
 	@Override
-	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+	public boolean keyPressed(KeyEvent event) {
 		if (!this.enabled) {
 			return false;
 		}
+		int keyCode = event.key();
 		if (keyCode == 32 || keyCode == 257 || keyCode == 335) {
-			AbstractEntry focused = getSelectedOrNull();
+			AbstractEntry focused = getSelected();
 			if (focused != null) {
 				focused.toggle();
 				return true;
 			}
 		}
-		return super.keyPressed(keyCode, scanCode, modifiers);
+		return super.keyPressed(event);
 	}
 
-	public abstract static class AbstractEntry extends ElementListWidget.Entry<AbstractEntry> {
+	public abstract static class AbstractEntry extends ContainerObjectSelectionList.Entry<AbstractEntry> {
 		@Override
-		public List<? extends Element> children() {
+		public List<? extends GuiEventListener> children() {
 			return List.of();
 		}
 
 		@Override
-		public List<? extends Selectable> selectableChildren() {
+		public List<? extends NarratableEntry> narratables() {
 			return List.of();
 		}
 
@@ -279,8 +281,8 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			if (button == 0 && BiomeListWidget.this.enabled) {
+		public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+			if (event.button() == 0 && BiomeListWidget.this.enabled) {
 				BiomeListWidget.this.setSelected(this);
 				toggle();
 				return true;
@@ -289,11 +291,12 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 		}
 
 		@Override
-		public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-				int mouseX, int mouseY, boolean hovered, float tickDelta) {
-			Text text = Text.literal(this.modName + " (" + selectedCount() + "/" + this.group.size() + ")");
+		public void renderContent(GuiGraphics context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+			int x = getContentX();
+			int y = getContentY();
+			Component text = Component.literal(this.modName + " (" + selectedCount() + "/" + this.group.size() + ")");
 			int colour = BiomeListWidget.this.enabled ? HEADER : DISABLED;
-			context.drawTextWithShadow(BiomeListWidget.this.client.textRenderer, text, x, y + 2, colour);
+			context.drawString(BiomeListWidget.this.minecraft.font, text, x, y + 2, colour);
 		}
 	}
 
@@ -315,8 +318,8 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			if (button == 0 && BiomeListWidget.this.enabled) {
+		public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+			if (event.button() == 0 && BiomeListWidget.this.enabled) {
 				BiomeListWidget.this.setSelected(this);
 				toggle();
 				return true;
@@ -325,8 +328,10 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 		}
 
 		@Override
-		public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-				int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void renderContent(GuiGraphics context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+			int x = getContentX();
+			int y = getContentY();
+			int entryWidth = getWidth();
 			boolean on = BiomeListWidget.this.enabled;
 			int boxY = y + 1;
 			context.fill(x, boxY, x + BOX, boxY + BOX, on ? OUTLINE : DISABLED);
@@ -337,16 +342,16 @@ public class BiomeListWidget extends ElementListWidget<BiomeListWidget.AbstractE
 			if (hovered) {
 				BiomeListWidget.this.hovered = this.entry;
 			}
-			TextRenderer font = BiomeListWidget.this.client.textRenderer;
+			Font font = BiomeListWidget.this.minecraft.font;
 			int textX = x + BOX + GAP;
-			context.drawTextWithShadow(font, Text.literal(this.entry.displayName()), textX, y + 2,
+			context.drawString(font, Component.literal(this.entry.displayName()), textX, y + 2,
 					on ? NAME : DISABLED);
 			if (!this.showMod) {
 				return;
 			}
-			int modX = x + entryWidth - font.getWidth(this.entry.modName());
-			if (modX > textX + font.getWidth(this.entry.displayName()) + GAP) {
-				context.drawTextWithShadow(font, Text.literal(this.entry.modName()), modX, y + 2,
+			int modX = x + entryWidth - font.width(this.entry.modName());
+			if (modX > textX + font.width(this.entry.displayName()) + GAP) {
+				context.drawString(font, Component.literal(this.entry.modName()), modX, y + 2,
 						on ? MOD_GREY : DISABLED);
 			}
 		}

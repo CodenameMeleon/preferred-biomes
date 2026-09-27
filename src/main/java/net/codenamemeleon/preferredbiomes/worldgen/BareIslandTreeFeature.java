@@ -1,25 +1,25 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.noise.DoublePerlinNoiseSampler;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.StructureWorldAccess;
-import net.minecraft.world.gen.densityfunction.DensityFunction;
-import net.minecraft.world.gen.feature.ConfiguredFeature;
-import net.minecraft.world.gen.feature.DefaultFeatureConfig;
-import net.minecraft.world.gen.feature.Feature;
-import net.minecraft.world.gen.feature.util.FeatureContext;
-import net.minecraft.world.gen.noise.NoiseConfig;
-import net.minecraft.world.gen.noise.NoiseParametersKeys;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.Noises;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
+import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
-public class BareIslandTreeFeature extends Feature<DefaultFeatureConfig> {
+public class BareIslandTreeFeature extends Feature<NoneFeatureConfiguration> {
 
 	private static final double TREE_CHANCE = 0.4;
 
@@ -29,34 +29,34 @@ public class BareIslandTreeFeature extends Feature<DefaultFeatureConfig> {
 
 	private static final int SEARCH_RADIUS = 6;
 
-	private static final RegistryKey<ConfiguredFeature<?, ?>>[] SPECIES = species(
+	private static final ResourceKey<ConfiguredFeature<?, ?>>[] SPECIES = species(
 			"oak", "birch", "spruce");
 
 	@SafeVarargs
-	private static RegistryKey<ConfiguredFeature<?, ?>>[] species(String... names) {
+	private static ResourceKey<ConfiguredFeature<?, ?>>[] species(String... names) {
 		@SuppressWarnings("unchecked")
-		RegistryKey<ConfiguredFeature<?, ?>>[] keys = new RegistryKey[names.length];
+		ResourceKey<ConfiguredFeature<?, ?>>[] keys = new ResourceKey[names.length];
 		for (int i = 0; i < names.length; i++) {
-			keys[i] = RegistryKey.of(RegistryKeys.CONFIGURED_FEATURE, new Identifier(names[i]));
+			keys[i] = ResourceKey.create(Registries.CONFIGURED_FEATURE, Identifier.parse(names[i]));
 		}
 		return keys;
 	}
 
-	public BareIslandTreeFeature(Codec<DefaultFeatureConfig> codec) {
+	public BareIslandTreeFeature(Codec<NoneFeatureConfiguration> codec) {
 		super(codec);
 	}
 
 	@Override
-	public boolean generate(FeatureContext<DefaultFeatureConfig> context) {
-		StructureWorldAccess world = context.getWorld();
-		if (!(world.toServerWorld().getChunkManager().getChunkGenerator().getBiomeSource()
+	public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
+		WorldGenLevel world = context.level();
+		if (!(world.getLevel().getChunkSource().getGenerator().getBiomeSource()
 				instanceof PreferredBiomeSource source)) {
 			return false;
 		}
-		NoiseConfig noiseConfig = world.toServerWorld().getChunkManager().getNoiseConfig();
+		RandomState noiseConfig = world.getLevel().getChunkSource().randomState();
 		IslandField field = field(noiseConfig, source);
 
-		BlockPos origin = context.getOrigin();
+		BlockPos origin = context.origin();
 		double g = field.cellSize();
 		int cx = (int) Math.floor(origin.getX() / g);
 		int cz = (int) Math.floor(origin.getZ() / g);
@@ -80,15 +80,15 @@ public class BareIslandTreeFeature extends Feature<DefaultFeatureConfig> {
 		}
 
 		double pick = field.rollAt(centreX, centreZ, ROLL_SPECIES);
-		RegistryKey<ConfiguredFeature<?, ?>> key =
+		ResourceKey<ConfiguredFeature<?, ?>> key =
 				SPECIES[Math.min((int) (pick * SPECIES.length), SPECIES.length - 1)];
-		return world.getRegistryManager().get(RegistryKeys.CONFIGURED_FEATURE)
-				.getOrEmpty(key)
-				.map(tree -> tree.generate(world, context.getGenerator(), context.getRandom(), ground))
+		return world.registryAccess().lookupOrThrow(Registries.CONFIGURED_FEATURE)
+				.getOptional(key)
+				.map(tree -> tree.place(world, context.chunkGenerator(), context.random(), ground))
 				.orElse(false);
 	}
 
-	private static BlockPos findGround(StructureWorldAccess world, int centreX, int centreZ) {
+	private static BlockPos findGround(WorldGenLevel world, int centreX, int centreZ) {
 		for (int r = 0; r <= SEARCH_RADIUS; r++) {
 			for (int dx = -r; dx <= r; dx++) {
 				for (int dz = -r; dz <= r; dz++) {
@@ -97,9 +97,9 @@ public class BareIslandTreeFeature extends Feature<DefaultFeatureConfig> {
 					}
 					int x = centreX + dx;
 					int z = centreZ + dz;
-					int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+					int y = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
 					BlockState below = world.getBlockState(new BlockPos(x, y - 1, z));
-					if (below.isOf(Blocks.GRASS_BLOCK) || below.isOf(Blocks.DIRT)) {
+					if (below.is(Blocks.GRASS_BLOCK) || below.is(Blocks.DIRT)) {
 						return new BlockPos(x, y, z);
 					}
 				}
@@ -108,18 +108,18 @@ public class BareIslandTreeFeature extends Feature<DefaultFeatureConfig> {
 		return null;
 	}
 
-	private static IslandField field(NoiseConfig noiseConfig, PreferredBiomeSource source) {
+	private static IslandField field(RandomState noiseConfig, PreferredBiomeSource source) {
 		return new IslandField(source.islandSize(), source.islandFrequency(), source.islandNoise(),
 				IslandField.Channel.HEIGHT,
 				seeded(noiseConfig, IslandTerrain.ISLAND_JITTER),
 				seeded(noiseConfig, IslandTerrain.ISLAND_SHAPE),
-				seeded(noiseConfig, NoiseParametersKeys.OFFSET.getValue()),
-				seeded(noiseConfig, NoiseParametersKeys.TEMPERATURE.getValue()));
+				seeded(noiseConfig, Noises.SHIFT.identifier()),
+				seeded(noiseConfig, Noises.TEMPERATURE.identifier()));
 	}
 
-	private static DensityFunction.Noise seeded(NoiseConfig noiseConfig, Identifier id) {
-		RegistryKey<DoublePerlinNoiseSampler.NoiseParameters> key =
-				RegistryKey.of(RegistryKeys.NOISE_PARAMETERS, id);
-		return new DensityFunction.Noise(null, noiseConfig.getOrCreateSampler(key));
+	private static DensityFunction.NoiseHolder seeded(RandomState noiseConfig, Identifier id) {
+		ResourceKey<NormalNoise.NoiseParameters> key =
+				ResourceKey.create(Registries.NOISE, id);
+		return new DensityFunction.NoiseHolder(null, noiseConfig.getOrCreateNoise(key));
 	}
 }

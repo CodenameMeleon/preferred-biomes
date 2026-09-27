@@ -2,12 +2,11 @@ package net.codenamemeleon.preferredbiomes.mixin;
 
 import com.mojang.datafixers.util.Either;
 import net.codenamemeleon.preferredbiomes.worldgen.StructureGate;
-import net.minecraft.structure.StructurePiecesCollector;
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.gen.structure.Structure;
-
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.pieces.StructurePiecesBuilder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,26 +22,26 @@ public abstract class StructureMixin {
 
 	private static final int SEA_LEVEL = 63;
 
-	@Inject(method = "getValidStructurePosition", at = @At("HEAD"), cancellable = true)
-	private void preferredBiomes$gate(Structure.Context context,
-			CallbackInfoReturnable<Optional<Structure.StructurePosition>> info) {
+	@Inject(method = "findValidGenerationPoint", at = @At("HEAD"), cancellable = true)
+	private void preferredBiomes$gate(Structure.GenerationContext context,
+			CallbackInfoReturnable<Optional<Structure.GenerationStub>> info) {
 		if (!StructureGate.applies(context.chunkGenerator())) {
 			return;
 		}
-		String path = StructureGate.pathOf(context.dynamicRegistryManager(), (Structure) (Object) this);
+		String path = StructureGate.pathOf(context.registryAccess(), (Structure) (Object) this);
 		if (path != null && StructureGate.isGated(path)) {
 			info.setReturnValue(Optional.empty());
 		}
 	}
 
-	@Inject(method = "getValidStructurePosition", at = @At("RETURN"), cancellable = true)
-	private void preferredBiomes$requireLand(Structure.Context context,
-			CallbackInfoReturnable<Optional<Structure.StructurePosition>> info) {
+	@Inject(method = "findValidGenerationPoint", at = @At("RETURN"), cancellable = true)
+	private void preferredBiomes$requireLand(Structure.GenerationContext context,
+			CallbackInfoReturnable<Optional<Structure.GenerationStub>> info) {
 		String path = preferredBiomes$gatedPath(context);
 		if (path == null || !StructureGate.needsLand(path)) {
 			return;
 		}
-		Optional<Structure.StructurePosition> found = info.getReturnValue();
+		Optional<Structure.GenerationStub> found = info.getReturnValue();
 		if (found.isEmpty()) {
 			return;
 		}
@@ -60,59 +59,59 @@ public abstract class StructureMixin {
 		}
 	}
 
-	@Inject(method = "getValidStructurePosition", at = @At("RETURN"), cancellable = true)
-	private void preferredBiomes$sinkToFloor(Structure.Context context,
-			CallbackInfoReturnable<Optional<Structure.StructurePosition>> info) {
+	@Inject(method = "findValidGenerationPoint", at = @At("RETURN"), cancellable = true)
+	private void preferredBiomes$sinkToFloor(Structure.GenerationContext context,
+			CallbackInfoReturnable<Optional<Structure.GenerationStub>> info) {
 		String path = preferredBiomes$gatedPath(context);
 		if (path == null || !StructureGate.sinksToFloor(path)) {
 			return;
 		}
-		Optional<Structure.StructurePosition> found = info.getReturnValue();
+		Optional<Structure.GenerationStub> found = info.getReturnValue();
 		if (found.isEmpty()) {
 			return;
 		}
-		Structure.StructurePosition position = found.get();
-		StructurePiecesCollector pieces = position.generate();
+		Structure.GenerationStub position = found.get();
+		StructurePiecesBuilder pieces = position.getPiecesBuilder();
 		if (pieces.isEmpty()) {
 			return;
 		}
-		BlockBox box = pieces.getBoundingBox();
+		BoundingBox box = pieces.getBoundingBox();
 		BlockPos centre = box.getCenter();
-		pieces.shift(preferredBiomes$floorAt(context, centre.getX(), centre.getZ()) - box.getMaxY());
+		pieces.offsetPiecesVertically(preferredBiomes$floorAt(context, centre.getX(), centre.getZ()) - box.maxY());
 		info.setReturnValue(Optional.of(
-				new Structure.StructurePosition(position.position(), Either.right(pieces))));
+				new Structure.GenerationStub(position.position(), Either.right(pieces))));
 	}
 
-	private static int preferredBiomes$floorAt(Structure.Context context, int x, int z) {
-		return context.chunkGenerator().getHeight(x, z, Heightmap.Type.OCEAN_FLOOR_WG,
-				context.world(), context.noiseConfig()) - 1;
+	private static int preferredBiomes$floorAt(Structure.GenerationContext context, int x, int z) {
+		return context.chunkGenerator().getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG,
+				context.heightAccessor(), context.randomState()) - 1;
 	}
 
-	private String preferredBiomes$gatedPath(Structure.Context context) {
+	private String preferredBiomes$gatedPath(Structure.GenerationContext context) {
 		return StructureGate.applies(context.chunkGenerator())
-				? StructureGate.pathOf(context.dynamicRegistryManager(), (Structure) (Object) this)
+				? StructureGate.pathOf(context.registryAccess(), (Structure) (Object) this)
 				: null;
 	}
 
-	@ModifyVariable(method = "getValidStructurePosition", at = @At("HEAD"), argsOnly = true)
-	private Structure.Context preferredBiomes$widen(Structure.Context context) {
+	@ModifyVariable(method = "findValidGenerationPoint", at = @At("HEAD"), argsOnly = true)
+	private Structure.GenerationContext preferredBiomes$widen(Structure.GenerationContext context) {
 		if (!StructureGate.applies(context.chunkGenerator())) {
 			return context;
 		}
-		String path = StructureGate.pathOf(context.dynamicRegistryManager(), (Structure) (Object) this);
+		String path = StructureGate.pathOf(context.registryAccess(), (Structure) (Object) this);
 		if (path == null || !StructureGate.isReassigned(path)) {
 			return context;
 		}
-		return new Structure.Context(
-				context.dynamicRegistryManager(),
+		return new Structure.GenerationContext(
+				context.registryAccess(),
 				context.chunkGenerator(),
 				context.biomeSource(),
-				context.noiseConfig(),
+				context.randomState(),
 				context.structureTemplateManager(),
 				context.random(),
 				context.seed(),
 				context.chunkPos(),
-				context.world(),
-				StructureGate.widen(path, context.biomePredicate()));
+				context.heightAccessor(),
+				StructureGate.widen(path, context.validBiome()));
 	}
 }

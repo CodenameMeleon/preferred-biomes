@@ -6,30 +6,29 @@ import net.codenamemeleon.preferredbiomes.worldgen.IslandField;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandTerrain;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntryList;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.gen.StructureWeightSampler;
-import net.minecraft.world.gen.chunk.AquiferSampler;
-import net.minecraft.world.gen.chunk.Blender;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
-import net.minecraft.world.gen.chunk.ChunkNoiseSampler;
-import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
-import net.minecraft.world.gen.densityfunction.DensityFunction;
-import net.minecraft.world.gen.noise.NoiseConfig;
-
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.Aquifer;
+import net.minecraft.world.level.levelgen.Beardifier;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseChunk;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.blending.Blender;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,35 +41,35 @@ public final class ColumnCommand {
 
 	public static void register() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-				dispatcher.register(CommandManager.literal("pb")
-						.requires(source -> source.hasPermissionLevel(2))
-						.then(CommandManager.literal("column")
-								.then(CommandManager.argument("x", IntegerArgumentType.integer())
-										.then(CommandManager.argument("z", IntegerArgumentType.integer())
-												.then(CommandManager.argument("count", IntegerArgumentType.integer(1, 256))
+				dispatcher.register(Commands.literal("pb")
+						.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+						.then(Commands.literal("column")
+								.then(Commands.argument("x", IntegerArgumentType.integer())
+										.then(Commands.argument("z", IntegerArgumentType.integer())
+												.then(Commands.argument("count", IntegerArgumentType.integer(1, 256))
 														.executes(context -> column(
 																context.getSource(),
 																IntegerArgumentType.getInteger(context, "x"),
 																IntegerArgumentType.getInteger(context, "z"),
 																IntegerArgumentType.getInteger(context, "count")))))))
-						.then(CommandManager.literal("city")
+						.then(Commands.literal("city")
 								.executes(context -> city(context.getSource())))
-						.then(CommandManager.literal("probe")
-								.then(CommandManager.argument("x", IntegerArgumentType.integer())
-										.then(CommandManager.argument("z", IntegerArgumentType.integer())
+						.then(Commands.literal("probe")
+								.then(Commands.argument("x", IntegerArgumentType.integer())
+										.then(Commands.argument("z", IntegerArgumentType.integer())
 												.executes(context -> probe(
 														context.getSource(),
 														IntegerArgumentType.getInteger(context, "x"),
 														IntegerArgumentType.getInteger(context, "z"))))))
-						.then(CommandManager.literal("palette")
+						.then(Commands.literal("palette")
 								.executes(context -> palette(context.getSource())))
-						.then(CommandManager.literal("shape")
+						.then(Commands.literal("shape")
 								.executes(context -> shape(context.getSource())))
-						.then(CommandManager.literal("tree")
+						.then(Commands.literal("tree")
 								.executes(context -> tree(context.getSource())))
-						.then(CommandManager.literal("rolls")
-								.then(CommandManager.argument("x", IntegerArgumentType.integer())
-										.then(CommandManager.argument("z", IntegerArgumentType.integer())
+						.then(Commands.literal("rolls")
+								.then(Commands.argument("x", IntegerArgumentType.integer())
+										.then(Commands.argument("z", IntegerArgumentType.integer())
 												.executes(context -> rolls(
 														context.getSource(),
 														IntegerArgumentType.getInteger(context, "x"),
@@ -81,40 +80,40 @@ public final class ColumnCommand {
 	private static final double TREE_CHANCE = 0.4;
 	private static final int TREE_SEARCH = 6;
 
-	private static PreferredBiomeSource sourceOf(ServerCommandSource source) {
-		ChunkGenerator generator = source.getWorld().getChunkManager().getChunkGenerator();
+	private static PreferredBiomeSource sourceOf(CommandSourceStack source) {
+		ChunkGenerator generator = source.getLevel().getChunkSource().getGenerator();
 		if (generator.getBiomeSource() instanceof PreferredBiomeSource island
 				&& island.islandSurvivalChallenge()) {
 			return island;
 		}
-		source.sendError(Text.literal("Not an Island Survival Challenge world."));
+		source.sendFailure(Component.literal("Not an Island Survival Challenge world."));
 		return null;
 	}
 
-	private static int tree(ServerCommandSource source) {
+	private static int tree(CommandSourceStack source) {
 		PreferredBiomeSource biomeSource = sourceOf(source);
 		if (biomeSource == null) {
 			return 0;
 		}
-		ServerWorld world = source.getWorld();
-		NoiseConfig noiseConfig = world.getChunkManager().getNoiseConfig();
-		IslandField field = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		ServerLevel world = source.getLevel();
+		RandomState noiseConfig = world.getChunkSource().randomState();
+		IslandField field = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				biomeSource.islandSize(), biomeSource.islandFrequency(), biomeSource.islandNoise(),
 				IslandField.Channel.HEIGHT);
 
-		BlockPos origin = BlockPos.ofFloored(source.getPosition());
+		BlockPos origin = BlockPos.containing(source.getPosition());
 		double g = field.cellSize();
 		int cx = (int) Math.floor(origin.getX() / g);
 		int cz = (int) Math.floor(origin.getZ() / g);
 
 		IslandField.Shape shape = field.shapeAt(origin.getX(), origin.getZ());
 		if (shape == null) {
-			source.sendFeedback(() -> Text.literal("cell " + cx + "," + cz + ": no island"), false);
+			source.sendSuccess(() -> Component.literal("cell " + cx + "," + cz + ": no island"), false);
 			return 0;
 		}
 		BlockPos anchor = field.anchorLand(cx, cz);
 		if (anchor == null) {
-			source.sendFeedback(() -> Text.literal(String.format(
+			source.sendSuccess(() -> Component.literal(String.format(
 					"cell %d,%d radius %.1f: NO ANCHOR (no column 2+ blocks inland)",
 					cx, cz, shape.radius())), false);
 			return 1;
@@ -122,10 +121,10 @@ public final class ColumnCommand {
 		int x = anchor.getX();
 		int z = anchor.getZ();
 		double roll = field.rollAt(x, z, TREE_ROLL);
-		int top = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+		int top = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
 		BlockState below = world.getBlockState(new BlockPos(x, top - 1, z));
-		String biome = world.getBiome(new BlockPos(x, top, z)).getKey()
-				.map(key -> key.getValue().toString()).orElse("?");
+		String biome = world.getBiome(new BlockPos(x, top, z)).unwrapKey()
+				.map(key -> key.identifier().toString()).orElse("?");
 
 		String ground = "none within " + TREE_SEARCH;
 		outer:
@@ -137,9 +136,9 @@ public final class ColumnCommand {
 					}
 					int gx = x + dx;
 					int gz = z + dz;
-					int gy = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, gx, gz);
+					int gy = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, gx, gz);
 					BlockState under = world.getBlockState(new BlockPos(gx, gy - 1, gz));
-					if (under.isOf(Blocks.GRASS_BLOCK) || under.isOf(Blocks.DIRT)) {
+					if (under.is(Blocks.GRASS_BLOCK) || under.is(Blocks.DIRT)) {
 						ground = "found at r=" + r + " (" + gx + "," + gy + "," + gz + ")";
 						break outer;
 					}
@@ -152,26 +151,26 @@ public final class ColumnCommand {
 						+ "top %d below %s  biome %s  ground %s",
 				cx, cz, shape.radius(), x, z, x >> 4, z >> 4, roll,
 				roll < TREE_CHANCE ? "TREE" : "no tree", top,
-				Registries.BLOCK.getId(below.getBlock()).getPath(), biome, ground);
-		source.sendFeedback(() -> Text.literal(line), false);
+				BuiltInRegistries.BLOCK.getKey(below.getBlock()).getPath(), biome, ground);
+		source.sendSuccess(() -> Component.literal(line), false);
 		return 1;
 	}
 
-	private static int rolls(ServerCommandSource source, int x, int z) {
+	private static int rolls(CommandSourceStack source, int x, int z) {
 		PreferredBiomeSource island = sourceOf(source);
 		if (island == null) {
 			return 0;
 		}
-		ServerWorld world = source.getWorld();
-		NoiseConfig noiseConfig = world.getChunkManager().getNoiseConfig();
-		IslandField field = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		ServerLevel world = source.getLevel();
+		RandomState noiseConfig = world.getChunkSource().randomState();
+		IslandField field = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				island.islandSize(), island.islandFrequency(), island.islandNoise(),
 				IslandField.Channel.HEIGHT);
 
 		double cell = field.cellSize();
 		int cx = (int) Math.floor(x / cell);
 		int cz = (int) Math.floor(z / cell);
-		source.sendFeedback(() -> Text.literal(String.format(
+		source.sendSuccess(() -> Component.literal(String.format(
 				"cellSize=%.0f  cell=%d,%d  centre=%.0f,%.0f  frequency=%.2f",
 				cell, cx, cz, cx * cell + cell / 2.0, cz * cell + cell / 2.0,
 				island.islandFrequency())), false);
@@ -186,127 +185,127 @@ public final class ColumnCommand {
 			line.append(String.format(" k%d=%.6f", k, value));
 		}
 		String rendered = line.toString();
-		source.sendFeedback(() -> Text.literal(rendered), false);
+		source.sendSuccess(() -> Component.literal(rendered), false);
 		boolean unseeded = allHalf;
-		source.sendFeedback(() -> Text.literal(unseeded
+		source.sendSuccess(() -> Component.literal(unseeded
 				? "VERDICT: every roll is exactly 0.5 - the noise is UNSEEDED"
 				: "VERDICT: rolls vary - the noise is seeded"), false);
 		return 1;
 	}
 
-	private static int city(ServerCommandSource source) {
-		ServerWorld world = source.getWorld();
-		var structures = world.getRegistryManager().get(RegistryKeys.STRUCTURE);
-		var entry = structures.getEntry(
-				RegistryKey.of(RegistryKeys.STRUCTURE, new Identifier("ancient_city")));
+	private static int city(CommandSourceStack source) {
+		ServerLevel world = source.getLevel();
+		var structures = world.registryAccess().lookupOrThrow(Registries.STRUCTURE);
+		var entry = structures.get(
+				ResourceKey.create(Registries.STRUCTURE, Identifier.parse("ancient_city")));
 		if (entry.isEmpty()) {
-			source.sendError(Text.literal("ancient_city is not in the structure registry."));
+			source.sendFailure(Component.literal("ancient_city is not in the structure registry."));
 			return 0;
 		}
-		BlockPos centre = BlockPos.ofFloored(source.getPosition());
-		var found = world.getChunkManager().getChunkGenerator().locateStructure(
-				world, RegistryEntryList.of(entry.get()), centre, 100, false);
+		BlockPos centre = BlockPos.containing(source.getPosition());
+		var found = world.getChunkSource().getGenerator().findNearestMapStructure(
+				world, HolderSet.direct(entry.get()), centre, 100, false);
 		if (found == null) {
-			source.sendError(Text.literal("No ancient city within 100 chunks of " + centre));
+			source.sendFailure(Component.literal("No ancient city within 100 chunks of " + centre));
 			return 0;
 		}
 		BlockPos at = found.getFirst();
-		source.sendFeedback(() -> Text.literal("ancient_city at " + at.getX() + " " + at.getY()
+		source.sendSuccess(() -> Component.literal("ancient_city at " + at.getX() + " " + at.getY()
 				+ " " + at.getZ()), false);
 		probe(source, at.getX(), at.getZ());
 		probe(source, at.getX() + 300, at.getZ());
 		return 1;
 	}
 
-	private static int probe(ServerCommandSource source, int x, int z) {
+	private static int probe(CommandSourceStack source, int x, int z) {
 		PreferredBiomeSource island = sourceOf(source);
 		if (island == null) {
 			return 0;
 		}
-		ServerWorld world = source.getWorld();
-		NoiseConfig noiseConfig = world.getChunkManager().getNoiseConfig();
+		ServerLevel world = source.getLevel();
+		RandomState noiseConfig = world.getChunkSource().randomState();
 		int size = island.islandSize();
 		float frequency = island.islandFrequency();
 		int noise = island.islandNoise();
 
-		source.sendFeedback(() -> Text.literal("--- column " + x + " " + z + " ---"), false);
+		source.sendSuccess(() -> Component.literal("--- column " + x + " " + z + " ---"), false);
 
 		StringBuilder blocks = new StringBuilder("  blocks y55-65:");
 		for (int y = 55; y <= 65; y++) {
 			BlockState state = world.getBlockState(new BlockPos(x, y, z));
-			Identifier id = Registries.BLOCK.getId(state.getBlock());
+			Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
 			String name = "minecraft".equals(id.getNamespace()) ? id.getPath() : id.toString();
-			if (!state.getFluidState().isEmpty() && !state.getFluidState().isStill()) {
+			if (!state.getFluidState().isEmpty() && !state.getFluidState().isSource()) {
 				name = name + "(flowing)";
 			}
 			blocks.append(' ').append(y).append('=').append(name);
 		}
 		String blockLine = blocks.toString();
-		source.sendFeedback(() -> Text.literal(blockLine), false);
+		source.sendSuccess(() -> Component.literal(blockLine), false);
 
-		ChunkGenerator generator = world.getChunkManager().getChunkGenerator();
-		ChunkGeneratorSettings settings = ((NoiseChunkGenerator) generator).getSettings().value();
+		ChunkGenerator generator = world.getChunkSource().getGenerator();
+		NoiseGeneratorSettings settings = ((NoiseBasedChunkGenerator) generator).generatorSettings().value();
 		int seaLevel = settings.seaLevel();
-		AquiferSampler.FluidLevel lava =
-				new AquiferSampler.FluidLevel(-54, Blocks.LAVA.getDefaultState());
-		AquiferSampler.FluidLevel sea =
-				new AquiferSampler.FluidLevel(seaLevel, Blocks.WATER.getDefaultState());
-		AquiferSampler.FluidLevelSampler fluids =
+		Aquifer.FluidStatus lava =
+				new Aquifer.FluidStatus(-54, Blocks.LAVA.defaultBlockState());
+		Aquifer.FluidStatus sea =
+				new Aquifer.FluidStatus(seaLevel, Blocks.WATER.defaultBlockState());
+		Aquifer.FluidPicker fluids =
 				(fx, fy, fz) -> fy < Math.min(-54, seaLevel) ? lava : sea;
 		ChunkPos chunkPos = new ChunkPos(x >> 4, z >> 4);
-		StructureWeightSampler beard = StructureWeightSampler.createStructureWeightSampler(
-				world.getStructureAccessor(), chunkPos);
-		ChunkNoiseSampler sampler = ChunkNoiseSampler.create(
+		Beardifier beard = Beardifier.forStructuresInChunk(
+				world.structureManager(), chunkPos);
+		NoiseChunk sampler = NoiseChunk.forChunk(
 				world.getChunk(chunkPos.x, chunkPos.z), noiseConfig, beard, settings, fluids,
-				Blender.getNoBlending());
-		int preliminary = sampler.estimateSurfaceHeight(x, z);
-		source.sendFeedback(() -> Text.literal("  preliminarySurfaceLevel = " + preliminary), false);
+				Blender.empty());
+		int preliminary = sampler.preliminarySurfaceLevel(x, z);
+		source.sendSuccess(() -> Component.literal("  preliminarySurfaceLevel = " + preliminary), false);
 
-		DensityFunction field = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		DensityFunction field = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				size, frequency, noise, IslandField.Channel.HEIGHT);
 		DensityFunction vanillaOffset = IslandTerrain.seededVanillaOffset(
-				world.getRegistryManager(), noiseConfig);
-		DensityFunction mask = IslandTerrain.seededMask(world.getRegistryManager(), noiseConfig,
+				world.registryAccess(), noiseConfig);
+		DensityFunction mask = IslandTerrain.seededMask(world.registryAccess(), noiseConfig,
 				size, frequency, noise);
-		DensityFunction.NoisePos flat = new DensityFunction.UnblendedNoisePos(x, 0, z);
+		DensityFunction.FunctionContext flat = new DensityFunction.SinglePointContext(x, 0, z);
 		String fieldLine = String.format("  fieldY = %.2f   mask = %.3f   vanillaFloorY = %.2f",
-				128.0 + 128.0 * field.sample(flat), mask.sample(flat),
-				128.0 + 128.0 * vanillaOffset.sample(flat));
-		source.sendFeedback(() -> Text.literal(fieldLine), false);
+				128.0 + 128.0 * field.compute(flat), mask.compute(flat),
+				128.0 + 128.0 * vanillaOffset.compute(flat));
+		source.sendSuccess(() -> Component.literal(fieldLine), false);
 
 		StringBuilder beards = new StringBuilder("  beardifier:");
 		for (int y : new int[]{50, 55, 60}) {
 			beards.append(String.format(" y%d=%.4f", y,
-					beard.sample(new DensityFunction.UnblendedNoisePos(x, y, z))));
+					beard.compute(new DensityFunction.SinglePointContext(x, y, z))));
 		}
 		String beardLine = beards.toString();
-		source.sendFeedback(() -> Text.literal(beardLine), false);
+		source.sendSuccess(() -> Component.literal(beardLine), false);
 		return 1;
 	}
 
 
-	private static int palette(ServerCommandSource source) {
+	private static int palette(CommandSourceStack source) {
 		PreferredBiomeSource island = sourceOf(source);
 		if (island == null) {
 			return 0;
 		}
-		ServerWorld world = source.getWorld();
-		NoiseConfig noiseConfig = world.getChunkManager().getNoiseConfig();
+		ServerLevel world = source.getLevel();
+		RandomState noiseConfig = world.getChunkSource().randomState();
 		int size = island.islandSize();
 		float frequency = island.islandFrequency();
 		int noise = island.islandNoise();
-		IslandField shore = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		IslandField shore = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				size, frequency, noise, IslandField.Channel.SHORE);
-		IslandField ring = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		IslandField ring = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				size, frequency, noise, IslandField.Channel.SHORE_RING);
 
-		BlockPos origin = BlockPos.ofFloored(source.getPosition());
+		BlockPos origin = BlockPos.containing(source.getPosition());
 		double g = shore.cellSize();
 		int cx = (int) Math.floor(origin.getX() / g);
 		int cz = (int) Math.floor(origin.getZ() / g);
 		IslandField.Shape geometry = shore.shapeAt((int) (cx * g + g / 2.0), (int) (cz * g + g / 2.0));
 		if (geometry == null) {
-			source.sendFeedback(() -> Text.literal("no island in this cell"), false);
+			source.sendSuccess(() -> Component.literal("no island in this cell"), false);
 			return 0;
 		}
 
@@ -328,17 +327,17 @@ public final class ColumnCommand {
 		double shelfSum = 0.0;
 		double shelfSq = 0.0;
 		int n = 0;
-		BlockPos.Mutable pos = new BlockPos.Mutable();
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 		for (int z = centreZ - reach; z <= centreZ + reach; z++) {
 			for (int x = centreX - reach; x <= centreX + reach; x++) {
-				if (!world.isChunkLoaded(x >> 4, z >> 4)) {
+				if (!world.hasChunk(x >> 4, z >> 4)) {
 					skipped++;
 					continue;
 				}
-				int surface = world.getTopY(Heightmap.Type.WORLD_SURFACE_WG, x, z) - 1;
-				int floor = world.getTopY(Heightmap.Type.OCEAN_FLOOR, x, z) - 1;
-				double s = shore.sample(new DensityFunction.UnblendedNoisePos(x, 0, z));
-				double r = ring.sample(new DensityFunction.UnblendedNoisePos(x, 0, z));
+				int surface = world.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) - 1;
+				int floor = world.getHeight(Heightmap.Types.OCEAN_FLOOR, x, z) - 1;
+				double s = shore.compute(new DensityFunction.SinglePointContext(x, 0, z));
+				double r = ring.compute(new DensityFunction.SinglePointContext(x, 0, z));
 				String cls;
 				int top;
 				if (s == IslandField.NO_SHORE) {
@@ -358,7 +357,7 @@ public final class ColumnCommand {
 				}
 				pos.set(x, top, z);
 				BlockState state = world.getBlockState(pos);
-				String name = Registries.BLOCK.getId(state.getBlock()).getPath();
+				String name = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
 				tallies.get(cls).addTo(name, 1);
 				if (!cls.equals("shelf")) {
 					double sn = shore.shoreNoiseAt(x, z);
@@ -398,12 +397,12 @@ public final class ColumnCommand {
 				line.append(String.format("other %.0f%%", 100.0 * rest / total));
 			}
 			String text = line.toString();
-			source.sendFeedback(() -> Text.literal(text), false);
+			source.sendSuccess(() -> Component.literal(text), false);
 		}
 		String settings = String.format(
 				"noise %d  gain %.2f  reach %.2fx  skipped %d unloaded columns",
 				noise, shore.maskGain(), shore.maskReach(), skipped);
-		source.sendFeedback(() -> Text.literal(settings), false);
+		source.sendSuccess(() -> Component.literal(settings), false);
 		if (n > 0) {
 			int count = n;
 			String noiseLine = String.format(
@@ -412,27 +411,27 @@ public final class ColumnCommand {
 					Math.sqrt(shoreSq / count - (shoreSum / count) * (shoreSum / count)),
 					shelfMin, shelfMax,
 					Math.sqrt(shelfSq / count - (shelfSum / count) * (shelfSum / count)));
-			source.sendFeedback(() -> Text.literal(noiseLine), false);
+			source.sendSuccess(() -> Component.literal(noiseLine), false);
 		}
 		return 1;
 	}
 
-	private static int shape(ServerCommandSource source) {
+	private static int shape(CommandSourceStack source) {
 		PreferredBiomeSource island = sourceOf(source);
 		if (island == null) {
 			return 0;
 		}
-		ServerWorld world = source.getWorld();
-		NoiseConfig noiseConfig = world.getChunkManager().getNoiseConfig();
+		ServerLevel world = source.getLevel();
+		RandomState noiseConfig = world.getChunkSource().randomState();
 		int size = island.islandSize();
 		float frequency = island.islandFrequency();
 		int noise = island.islandNoise();
-		IslandField shore = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		IslandField shore = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				size, frequency, noise, IslandField.Channel.SHORE);
-		IslandField height = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		IslandField height = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				size, frequency, noise, IslandField.Channel.HEIGHT);
 
-		BlockPos origin = BlockPos.ofFloored(source.getPosition());
+		BlockPos origin = BlockPos.containing(source.getPosition());
 		double g = shore.cellSize();
 		int baseX = (int) Math.floor(origin.getX() / g);
 		int baseZ = (int) Math.floor(origin.getZ() / g);
@@ -448,11 +447,11 @@ public final class ColumnCommand {
 				}
 				found++;
 				String line = measure(shore, height, geometry, baseX + dx, baseZ + dz);
-				source.sendFeedback(() -> Text.literal(line), false);
+				source.sendSuccess(() -> Component.literal(line), false);
 			}
 		}
 		if (found == 0) {
-			source.sendFeedback(() -> Text.literal("no islands in the nine cells here"), false);
+			source.sendSuccess(() -> Component.literal("no islands in the nine cells here"), false);
 		}
 		return found;
 	}
@@ -476,10 +475,10 @@ public final class ColumnCommand {
 			for (int iz = 0; iz < span; iz++) {
 				int x = centreX - reach + ix;
 				int z = centreZ - reach + iz;
-				DensityFunction.NoisePos pos = new DensityFunction.UnblendedNoisePos(x, 0, z);
-				double h = height.sample(pos);
+				DensityFunction.FunctionContext pos = new DensityFunction.SinglePointContext(x, 0, z);
+				double h = height.compute(pos);
 				heights[ix * span + iz] = h;
-				if (shore.sample(pos) >= 0.0) {
+				if (shore.compute(pos) >= 0.0) {
 					isLand[ix * span + iz] = true;
 					land.add(new int[]{x, z});
 					minX = Math.min(minX, x);
@@ -594,37 +593,37 @@ public final class ColumnCommand {
 		return Math.max(worst, Math.abs(128.0 * a - 128.0 * b));
 	}
 
-	private static int column(ServerCommandSource source, int x, int z, int count) {
+	private static int column(CommandSourceStack source, int x, int z, int count) {
 		PreferredBiomeSource island = sourceOf(source);
 		if (island == null) {
 			return 0;
 		}
-		ServerWorld world = source.getWorld();
-		NoiseConfig noiseConfig = world.getChunkManager().getNoiseConfig();
+		ServerLevel world = source.getLevel();
+		RandomState noiseConfig = world.getChunkSource().randomState();
 		int size = island.islandSize();
 		float frequency = island.islandFrequency();
 		int noise = island.islandNoise();
-		DensityFunction field = IslandTerrain.seededField(world.getRegistryManager(), noiseConfig,
+		DensityFunction field = IslandTerrain.seededField(world.registryAccess(), noiseConfig,
 				size, frequency, noise, IslandField.Channel.HEIGHT);
 		DensityFunction vanillaOffset = IslandTerrain.seededVanillaOffset(
-				world.getRegistryManager(), noiseConfig);
-		DensityFunction mask = IslandTerrain.seededMask(world.getRegistryManager(), noiseConfig,
+				world.registryAccess(), noiseConfig);
+		DensityFunction mask = IslandTerrain.seededMask(world.registryAccess(), noiseConfig,
 				size, frequency, noise);
 
-		source.sendFeedback(() -> Text.literal(String.format(
+		source.sendSuccess(() -> Component.literal(String.format(
 				"size=%d frequency=%.2f noise=%d   x z fieldY mask vanillaFloorY topSolidY",
 				size, frequency, noise)), false);
 
 		for (int i = 0; i < count; i++) {
 			int px = x + i;
-			DensityFunction.NoisePos pos = new DensityFunction.UnblendedNoisePos(px, 0, z);
+			DensityFunction.FunctionContext pos = new DensityFunction.SinglePointContext(px, 0, z);
 			world.getChunk(px >> 4, z >> 4);
-			int topSolidY = world.getTopY(Heightmap.Type.OCEAN_FLOOR, px, z) - 1;
+			int topSolidY = world.getHeight(Heightmap.Types.OCEAN_FLOOR, px, z) - 1;
 			String line = String.format("%d %d %.2f %.3f %.2f %d%s",
-					px, z, 128.0 + 128.0 * field.sample(pos), mask.sample(pos),
-					128.0 + 128.0 * vanillaOffset.sample(pos), topSolidY,
+					px, z, 128.0 + 128.0 * field.compute(pos), mask.compute(pos),
+					128.0 + 128.0 * vanillaOffset.compute(pos), topSolidY,
 					(px & 15) == 0 ? "   <- chunk boundary" : "");
-			source.sendFeedback(() -> Text.literal(line), false);
+			source.sendSuccess(() -> Component.literal(line), false);
 		}
 		return count;
 	}

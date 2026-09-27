@@ -3,22 +3,21 @@ package net.codenamemeleon.preferredbiomes.worldgen;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.codenamemeleon.preferredbiomes.mixin.MaterialRuleContextAccessor;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.dynamic.CodecHolder;
-import net.minecraft.util.math.noise.DoublePerlinNoiseSampler;
-import net.minecraft.util.math.random.RandomSplitter;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.world.gen.densityfunction.DensityFunction;
-import net.minecraft.world.gen.noise.NoiseConfig;
-import net.minecraft.world.gen.noise.NoiseParametersKeys;
-import net.minecraft.world.gen.surfacebuilder.MaterialRules;
-
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.KeyDispatchDataCodec;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.Noises;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-public final class IslandShoreCondition implements MaterialRules.MaterialCondition {
+public final class IslandShoreCondition implements SurfaceRules.ConditionSource {
 
 	private static final double RING_ALWAYS = 3.0;
 
@@ -30,9 +29,9 @@ public final class IslandShoreCondition implements MaterialRules.MaterialConditi
 
 	private static final float ODDS_FIVE = 0.20F;
 
-	public static final Identifier SHORE_DITHER = new Identifier("preferred-biomes", "shore_dither");
+	public static final Identifier SHORE_DITHER = Identifier.fromNamespaceAndPath("preferred-biomes", "shore_dither");
 
-	public static final CodecHolder<IslandShoreCondition> CODEC_HOLDER = CodecHolder.of(
+	public static final KeyDispatchDataCodec<IslandShoreCondition> CODEC_HOLDER = KeyDispatchDataCodec.of(
 			RecordCodecBuilder.mapCodec(instance -> instance.group(
 					Codec.intRange(PreferredBiomeSource.MIN_ISLAND_SIZE, PreferredBiomeSource.MAX_ISLAND_SIZE)
 							.fieldOf("size").forGetter(IslandShoreCondition::size),
@@ -46,7 +45,7 @@ public final class IslandShoreCondition implements MaterialRules.MaterialConditi
 	private final float frequency;
 	private final int noise;
 
-	private final Map<NoiseConfig, Samplers> cache =
+	private final Map<RandomState, Samplers> cache =
 			Collections.synchronizedMap(new WeakHashMap<>());
 
 	public IslandShoreCondition(int size, float frequency, int noise) {
@@ -68,41 +67,41 @@ public final class IslandShoreCondition implements MaterialRules.MaterialConditi
 	}
 
 	@Override
-	public CodecHolder<? extends MaterialRules.MaterialCondition> codec() {
+	public KeyDispatchDataCodec<? extends SurfaceRules.ConditionSource> codec() {
 		return CODEC_HOLDER;
 	}
 
-	private record Samplers(IslandField ring, RandomSplitter dither) {
+	private record Samplers(IslandField ring, PositionalRandomFactory dither) {
 	}
 
-	private Samplers samplers(NoiseConfig noiseConfig) {
+	private Samplers samplers(RandomState noiseConfig) {
 		return this.cache.computeIfAbsent(noiseConfig, config -> new Samplers(
 				new IslandField(this.size, this.frequency, this.noise, IslandField.Channel.SHORE_RING,
 						seeded(config, IslandTerrain.ISLAND_JITTER),
 						seeded(config, IslandTerrain.ISLAND_SHAPE),
-						seeded(config, NoiseParametersKeys.OFFSET.getValue()),
-						seeded(config, NoiseParametersKeys.TEMPERATURE.getValue())),
-				config.getOrCreateRandomDeriver(SHORE_DITHER)));
+						seeded(config, Noises.SHIFT.identifier()),
+						seeded(config, Noises.TEMPERATURE.identifier())),
+				config.getOrCreateRandomFactory(SHORE_DITHER)));
 	}
 
-	private static DensityFunction.Noise seeded(NoiseConfig noiseConfig, Identifier id) {
-		RegistryKey<DoublePerlinNoiseSampler.NoiseParameters> key =
-				RegistryKey.of(RegistryKeys.NOISE_PARAMETERS, id);
-		return new DensityFunction.Noise(null, noiseConfig.getOrCreateSampler(key));
+	private static DensityFunction.NoiseHolder seeded(RandomState noiseConfig, Identifier id) {
+		ResourceKey<NormalNoise.NoiseParameters> key =
+				ResourceKey.create(Registries.NOISE, id);
+		return new DensityFunction.NoiseHolder(null, noiseConfig.getOrCreateNoise(key));
 	}
 
 	@Override
-	public MaterialRules.BooleanSupplier apply(MaterialRules.MaterialRuleContext context) {
+	public SurfaceRules.Condition apply(SurfaceRules.Context context) {
 		MaterialRuleContextAccessor accessor = (MaterialRuleContextAccessor) (Object) context;
 		Samplers samplers = samplers(accessor.getNoiseConfig());
 
-		return new MaterialRules.BooleanSupplier() {
+		return new SurfaceRules.Condition() {
 			private int lastX = Integer.MIN_VALUE;
 			private int lastZ = Integer.MIN_VALUE;
 			private boolean last;
 
 			@Override
-			public boolean get() {
+			public boolean test() {
 				int x = accessor.getBlockX();
 				int z = accessor.getBlockZ();
 				if (x == this.lastX && z == this.lastZ) {
@@ -112,7 +111,7 @@ public final class IslandShoreCondition implements MaterialRules.MaterialConditi
 				this.lastZ = z;
 
 				double ring = samplers.ring()
-						.sample(new DensityFunction.UnblendedNoisePos(x, 0, z));
+						.compute(new DensityFunction.SinglePointContext(x, 0, z));
 				if (ring <= IslandField.NO_SHORE) {
 					this.last = false;
 					return false;
@@ -123,7 +122,7 @@ public final class IslandShoreCondition implements MaterialRules.MaterialConditi
 				} else if (ring > RING_FIVE) {
 					this.last = false;
 				} else {
-					float u = samplers.dither().split(x, 0, z).nextFloat();
+					float u = samplers.dither().at(x, 0, z).nextFloat();
 					this.last = u < (ring <= RING_FOUR ? ODDS_FOUR : ODDS_FIVE);
 				}
 				return this.last;
