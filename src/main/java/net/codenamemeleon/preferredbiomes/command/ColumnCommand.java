@@ -256,7 +256,7 @@ public final class ColumnCommand {
 		Beardifier beard = Beardifier.forStructuresInChunk(
 				world.structureManager(), chunkPos);
 		NoiseChunk sampler = NoiseChunk.forChunk(
-				world.getChunk(chunkPos.x, chunkPos.z), noiseConfig, beard, settings, fluids,
+				world.getChunk(chunkPos.x(), chunkPos.z()), noiseConfig, beard, settings, fluids,
 				Blender.empty());
 		int preliminary = sampler.preliminarySurfaceLevel(x, z);
 		source.sendSuccess(() -> Component.literal("  preliminarySurfaceLevel = " + preliminary), false);

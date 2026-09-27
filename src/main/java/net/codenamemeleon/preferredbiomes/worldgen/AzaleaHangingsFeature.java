@@ -34,7 +34,7 @@ public class AzaleaHangingsFeature extends Feature<NoneFeatureConfiguration> {
 	public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
 		WorldGenLevel world = context.level();
 		RandomSource random = context.random();
-		ChunkPos chunk = new ChunkPos(context.origin());
+		ChunkPos chunk = ChunkPos.containing(context.origin());
 		int floor = world.getSeaLevel();
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 		boolean placed = false;

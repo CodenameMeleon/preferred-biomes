@@ -1,4 +1,4 @@
-accessWidener v2 named
+accessWidener v2 official
 
 # The constructor is private; the two static factories only accept one side of the Either each,
 # and a subclass needs to pass the Either straight through.

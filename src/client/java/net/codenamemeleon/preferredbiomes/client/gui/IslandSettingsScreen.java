@@ -1,7 +1,7 @@
 package net.codenamemeleon.preferredbiomes.client.gui;
 
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -67,9 +67,9 @@ public class IslandSettingsScreen extends Screen {
 	}
 
 	@Override
-	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-		context.drawCenteredString(this.font, this.title, this.width / 2, MARGIN, 0xFFFFFFFF);
-		super.render(context, mouseX, mouseY, delta);
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		context.centeredText(this.font, this.title, this.width / 2, MARGIN, 0xFFFFFFFF);
+		super.extractRenderState(context, mouseX, mouseY, delta);
 	}
 
 	private class SizeSlider extends AbstractSliderButton {

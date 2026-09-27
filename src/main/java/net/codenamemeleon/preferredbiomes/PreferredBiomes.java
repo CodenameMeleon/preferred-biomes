@@ -4,6 +4,7 @@ import net.codenamemeleon.preferredbiomes.worldgen.AzaleaHangingsFeature;
 import net.codenamemeleon.preferredbiomes.worldgen.BareIslandTreeFeature;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandField;
+import net.codenamemeleon.preferredbiomes.worldgen.IslandRouterSlot;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandShoreCondition;
 import net.codenamemeleon.preferredbiomes.worldgen.LushIslandPoolFeature;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
@@ -30,6 +31,8 @@ public class PreferredBiomes implements ModInitializer {
 
 		Registry.register(BuiltInRegistries.DENSITY_FUNCTION_TYPE, id("island_field"),
 				IslandField.CODEC_HOLDER.codec());
+		Registry.register(BuiltInRegistries.DENSITY_FUNCTION_TYPE, id("island_router_slot"),
+				IslandRouterSlot.CODEC.codec());
 
 		Registry.register(BuiltInRegistries.MATERIAL_CONDITION, id("island_shore"),
 				IslandShoreCondition.CODEC_HOLDER.codec());

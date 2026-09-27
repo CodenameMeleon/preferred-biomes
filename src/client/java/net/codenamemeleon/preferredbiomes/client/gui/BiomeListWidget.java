@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
@@ -64,9 +64,9 @@ public class BiomeListWidget extends ContainerObjectSelectionList<BiomeListWidge
 	}
 
 	@Override
-	public void renderWidget(GuiGraphics context, int mouseX, int mouseY, float delta) {
+	public void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 		this.hovered = null;
-		super.renderWidget(context, mouseX, mouseY, delta);
+		super.extractWidgetRenderState(context, mouseX, mouseY, delta);
 	}
 
 	public BiomeCatalog.Entry hoveredEntry() {
@@ -291,12 +291,12 @@ public class BiomeListWidget extends ContainerObjectSelectionList<BiomeListWidge
 		}
 
 		@Override
-		public void renderContent(GuiGraphics context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void extractContent(GuiGraphicsExtractor context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
 			int x = getContentX();
 			int y = getContentY();
 			Component text = Component.literal(this.modName + " (" + selectedCount() + "/" + this.group.size() + ")");
 			int colour = BiomeListWidget.this.enabled ? HEADER : DISABLED;
-			context.drawString(BiomeListWidget.this.minecraft.font, text, x, y + 2, colour);
+			context.text(BiomeListWidget.this.minecraft.font, text, x, y + 2, colour);
 		}
 	}
 
@@ -328,7 +328,7 @@ public class BiomeListWidget extends ContainerObjectSelectionList<BiomeListWidge
 		}
 
 		@Override
-		public void renderContent(GuiGraphics context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void extractContent(GuiGraphicsExtractor context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
 			int x = getContentX();
 			int y = getContentY();
 			int entryWidth = getWidth();
@@ -344,14 +344,14 @@ public class BiomeListWidget extends ContainerObjectSelectionList<BiomeListWidge
 			}
 			Font font = BiomeListWidget.this.minecraft.font;
 			int textX = x + BOX + GAP;
-			context.drawString(font, Component.literal(this.entry.displayName()), textX, y + 2,
+			context.text(font, Component.literal(this.entry.displayName()), textX, y + 2,
 					on ? NAME : DISABLED);
 			if (!this.showMod) {
 				return;
 			}
 			int modX = x + entryWidth - font.width(this.entry.modName());
 			if (modX > textX + font.width(this.entry.displayName()) + GAP) {
-				context.drawString(font, Component.literal(this.entry.modName()), modX, y + 2,
+				context.text(font, Component.literal(this.entry.modName()), modX, y + 2,
 						on ? MOD_GREY : DISABLED);
 			}
 		}

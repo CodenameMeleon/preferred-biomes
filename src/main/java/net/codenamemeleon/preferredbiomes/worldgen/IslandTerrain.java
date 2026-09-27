@@ -87,7 +87,41 @@ public final class IslandTerrain {
 				vanilla.useLegacyRandomSource());
 	}
 
+	public static DensityFunction buildSlot(IslandRouterSlot.Slot slot, NoiseRouter vanilla,
+			NoiseSettings noiseSettings, HolderGetter<DensityFunction> functions,
+			HolderGetter<NormalNoise.NoiseParameters> noises, int size, float frequency, int noise) {
+		NoiseRouter router = buildRouter(vanilla, noiseSettings, functions, noises, size, frequency, noise);
+		return slot == IslandRouterSlot.Slot.FINAL_DENSITY
+				? router.finalDensity()
+				: router.preliminarySurfaceLevel();
+	}
+
 	private static NoiseRouter createRouter(NoiseRouter vanilla, NoiseSettings noiseSettings,
+			HolderGetter<DensityFunction> functions,
+			HolderGetter<NormalNoise.NoiseParameters> noises,
+			int size, float frequency, int noise) {
+		NoiseRouter router = buildRouter(vanilla, noiseSettings, functions, noises, size, frequency, noise);
+		return new NoiseRouter(
+				router.barrierNoise(),
+				router.fluidLevelFloodednessNoise(),
+				router.fluidLevelSpreadNoise(),
+				router.lavaNoise(),
+				router.temperature(),
+				router.vegetation(),
+				router.continents(),
+				router.erosion(),
+				router.depth(),
+				router.ridges(),
+				new IslandRouterSlot(size, frequency, noise, IslandRouterSlot.Slot.PRELIMINARY_SURFACE_LEVEL,
+						router.preliminarySurfaceLevel()),
+				new IslandRouterSlot(size, frequency, noise, IslandRouterSlot.Slot.FINAL_DENSITY,
+						router.finalDensity()),
+				router.veinToggle(),
+				router.veinRidged(),
+				router.veinGap());
+	}
+
+	private static NoiseRouter buildRouter(NoiseRouter vanilla, NoiseSettings noiseSettings,
 			HolderGetter<DensityFunction> functions,
 			HolderGetter<NormalNoise.NoiseParameters> noises,
 			int size, float frequency, int noise) {
@@ -330,7 +364,7 @@ public final class IslandTerrain {
 		Holder<DensityFunction> entry =
 				function instanceof DensityFunctions.HolderHolder holder
 						? holder.function()
-						: new Holder.Direct<>(function);
+						: Holder.direct(function);
 		return new DensityFunctions.Spline.Coordinate(entry);
 	}
 

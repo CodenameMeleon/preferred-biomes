@@ -15,7 +15,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Difficulty;
-import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
@@ -132,8 +131,8 @@ public final class DebugWorldRunner {
 
 	private static void createWorld(Minecraft client, long seed) {
 		PreferredBiomes.LOGGER.info("[PB-AUTORUN] creating world");
-		LevelSettings levelInfo = new LevelSettings("pb-autorun", GameType.CREATIVE, false,
-				Difficulty.PEACEFUL, true, new GameRules(WorldDataConfiguration.DEFAULT.enabledFeatures()),
+		LevelSettings levelInfo = new LevelSettings("pb-autorun", GameType.CREATIVE,
+				new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true,
 				WorldDataConfiguration.DEFAULT);
 		client.createWorldOpenFlows().createFreshLevel("pb-autorun", levelInfo,
 				new WorldOptions(seed, true, false), DebugWorldRunner::dimensions, client.screen);

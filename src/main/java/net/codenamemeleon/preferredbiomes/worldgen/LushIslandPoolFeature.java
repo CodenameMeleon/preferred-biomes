@@ -45,8 +45,8 @@ public class LushIslandPoolFeature extends Feature<NoneFeatureConfiguration> {
 		if (anchor == null) {
 			return false;
 		}
-		ChunkPos chunk = new ChunkPos(origin);
-		if (!new ChunkPos(anchor).equals(chunk)) {
+		ChunkPos chunk = ChunkPos.containing(origin);
+		if (!ChunkPos.containing(anchor).equals(chunk)) {
 			return false;
 		}
 

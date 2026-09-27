@@ -1,13 +1,12 @@
 package net.codenamemeleon.preferredbiomes.client.gui;
 
 import com.mojang.datafixers.util.Either;
-import net.codenamemeleon.preferredbiomes.PreferredBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandTerrain;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -83,8 +82,6 @@ public class PreferredBiomesScreen extends Screen {
 	private Optional<BiomeCatalog.Temperature> temperatureFilter = Optional.empty();
 	private Optional<BiomeCatalog.Humidity> humidityFilter = Optional.empty();
 	private Optional<String> modFilter = Optional.empty();
-
-	private boolean tooltipWidthWarned;
 
 	private BiomeListWidget list;
 	private EditBox search;
@@ -332,7 +329,7 @@ public class PreferredBiomesScreen extends Screen {
 		return "- " + plant;
 	}
 
-	private void drawPlantTooltip(GuiGraphics context, List<Component> lines, int mouseX, int mouseY) {
+	private void drawPlantTooltip(GuiGraphicsExtractor context, List<Component> lines, int mouseX, int mouseY) {
 		Font font = this.font;
 		int linePitch = font.lineHeight + 1;
 		int textW = 0;
@@ -369,13 +366,7 @@ public class PreferredBiomesScreen extends Screen {
 		int textX = x + TOOLTIP_PAD;
 		int textY = y + TOOLTIP_PAD;
 		for (Component line : lines) {
-			context.drawString(font, line, textX, textY, 0xFFFFFFFF);
-			int end = textX + font.width(line) + 1;
-			if (end > textX + textW && !this.tooltipWidthWarned) {
-				this.tooltipWidthWarned = true;
-				PreferredBiomes.LOGGER.warn("tooltip line drew {} px past its measured width: {}",
-						end - textX - textW, line.getString());
-			}
+			context.text(font, line, textX, textY, 0xFFFFFFFF);
 			textY += linePitch;
 		}
 	}
@@ -466,19 +457,19 @@ public class PreferredBiomesScreen extends Screen {
 	}
 
 	@Override
-	public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-		this.list.render(context, mouseX, mouseY, delta);
-		context.drawCenteredString(this.font, this.title, this.width / 2, MARGIN, 0xFFFFFFFF);
-		context.drawCenteredString(this.font,
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		this.list.extractRenderState(context, mouseX, mouseY, delta);
+		context.centeredText(this.font, this.title, this.width / 2, MARGIN, 0xFFFFFFFF);
+		context.centeredText(this.font,
 				Component.translatable("preferred-biomes.screen.counter",
 						this.selected.size(), this.catalog.size()),
 				this.width / 2, this.counterY, this.islandChallenge ? 0xFF606060 : 0xFFA0A0A0);
 		if (this.islandChallenge) {
-			context.drawCenteredString(this.font,
+			context.centeredText(this.font,
 					Component.translatable("preferred-biomes.screen.challenge_note"),
 					this.width / 2, this.challengeNoteY, 0xFFA0A0A0);
 		}
-		super.render(context, mouseX, mouseY, delta);
+		super.extractRenderState(context, mouseX, mouseY, delta);
 		BiomeCatalog.Entry hovered = this.list.hoveredEntry();
 		if (hovered != null) {
 			drawPlantTooltip(context, tooltipLines(hovered), mouseX, mouseY);
