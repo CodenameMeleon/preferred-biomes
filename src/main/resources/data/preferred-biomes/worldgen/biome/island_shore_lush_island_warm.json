@@ -62,6 +62,7 @@
     ],
     [
       "minecraft:glow_lichen",
+      "preferred-biomes:lush_island_pool_anchor",
       "minecraft:trees_water",
       "minecraft:flower_default",
       "minecraft:brown_mushroom_normal",

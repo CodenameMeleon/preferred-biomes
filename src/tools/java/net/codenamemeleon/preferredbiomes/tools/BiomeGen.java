@@ -253,7 +253,10 @@ public final class BiomeGen {
 		}
 		if (shore.island().equals("lush_island")) {
 			remove(step(biome, UNDERGROUND_ORES), "disk_sand", "disk_clay", "disk_gravel");
-			remove(step(biome, VEGETAL_DECORATION), "patch_grass_badlands");
+			JsonArray vegetation = step(biome, VEGETAL_DECORATION);
+			remove(vegetation, "patch_grass_badlands");
+			vegetation.asList().add(indexOf(vegetation, MC + "glow_lichen") + 1,
+					new JsonPrimitive(PB + "lush_island_pool_anchor"));
 		}
 
 		if (island.get("temperature").getAsDouble() < TURTLE_MIN_TEMPERATURE) {
