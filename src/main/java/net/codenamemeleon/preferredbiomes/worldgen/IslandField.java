@@ -606,10 +606,10 @@ public record IslandField(int size, float frequency, int noise, IslandField.Chan
 	}
 
 	@Override
-	public DensityFunction mapAll(DensityFunction.Visitor visitor) {
-		return visitor.apply(new IslandField(this.size, this.frequency, this.noise, this.channel,
+	public DensityFunction mapChildren(DensityFunction.Visitor visitor) {
+		return new IslandField(this.size, this.frequency, this.noise, this.channel,
 				visitor.visitNoise(this.jitter), visitor.visitNoise(this.shape),
-				visitor.visitNoise(this.offset), visitor.visitNoise(this.temperature)));
+				visitor.visitNoise(this.offset), visitor.visitNoise(this.temperature));
 	}
 
 	@Override

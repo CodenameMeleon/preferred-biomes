@@ -98,7 +98,7 @@ public final class DebugWorldRunner {
 				seed, islandSize, islandFrequency, islandNoise, tpArgument, commands.size());
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			if (!created && client.screen instanceof TitleScreen) {
+			if (!created && client.gui.screen() instanceof TitleScreen) {
 				created = true;
 				createWorld(client, seed);
 				return;
@@ -135,7 +135,7 @@ public final class DebugWorldRunner {
 				new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true,
 				WorldDataConfiguration.DEFAULT);
 		client.createWorldOpenFlows().createFreshLevel("pb-autorun", levelInfo,
-				new WorldOptions(seed, true, false), DebugWorldRunner::dimensions, client.screen);
+				new WorldOptions(seed, true, false), DebugWorldRunner::dimensions, client.gui.screen());
 	}
 
 	private static WorldDimensions dimensions(HolderLookup.Provider registryManager) {

@@ -4,7 +4,6 @@ import com.mojang.datafixers.util.Either;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandBiomes;
 import net.codenamemeleon.preferredbiomes.worldgen.IslandTerrain;
 import net.codenamemeleon.preferredbiomes.worldgen.PreferredBiomeSource;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -19,6 +18,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
@@ -131,7 +131,7 @@ public class PreferredBiomesScreen extends Screen {
 		this.search = new EditBox(this.font, centreX - HALF_W, y, searchW, WIDGET_H,
 				Component.translatable("preferred-biomes.screen.search"));
 		this.search.setHint(Component.translatable("preferred-biomes.screen.search")
-				.copy().withStyle(ChatFormatting.DARK_GRAY));
+				.copy().withColor(TextColor.DARK_GRAY));
 		this.search.setResponder(text -> {
 			if (this.list != null) {
 				this.list.setFilter(text);
@@ -218,7 +218,7 @@ public class PreferredBiomesScreen extends Screen {
 						}));
 		this.islandSettings = addRenderableWidget(Button.builder(
 						Component.translatable("preferred-biomes.screen.island_settings"),
-						button -> this.minecraft.setScreen(new IslandSettingsScreen(this,
+						button -> this.minecraft.gui.setScreen(new IslandSettingsScreen(this,
 								this.islandSize, this.islandFrequency, this.islandNoise,
 								(size, frequency, noise) -> {
 									this.islandSize = size;
@@ -268,7 +268,7 @@ public class PreferredBiomesScreen extends Screen {
 
 	private List<Component> tooltipLines(BiomeCatalog.Entry entry) {
 		List<Component> lines = new ArrayList<>();
-		lines.add(Component.literal(entry.modName()).withStyle(ChatFormatting.BOLD, ChatFormatting.UNDERLINE));
+		lines.add(Component.literal(entry.modName()).withStyle(style -> style.withBold(true).withUnderlined(true)));
 		lines.addAll(plantLines(entry.plants(), this.minecraft.hasShiftDown()));
 		return lines;
 	}
@@ -283,7 +283,7 @@ public class PreferredBiomesScreen extends Screen {
 				lines.add(Component.literal(cell(plant)));
 			}
 			lines.add(Component.literal(ELLIPSIS + " and " + (plants.size() - COLLAPSED)
-					+ " more (hold Shift)").withStyle(ChatFormatting.GRAY));
+					+ " more (hold Shift)").withColor(TextColor.GRAY));
 			return lines;
 		}
 		int rows = Math.min(plants.size(), ROWS_PER_COLUMN);
@@ -320,7 +320,7 @@ public class PreferredBiomesScreen extends Screen {
 		}
 		if (shown < plants.size()) {
 			lines.add(Component.literal(ELLIPSIS + " and " + (plants.size() - shown) + " more")
-					.withStyle(ChatFormatting.GRAY));
+					.withColor(TextColor.GRAY));
 		}
 		return lines;
 	}
@@ -453,7 +453,7 @@ public class PreferredBiomesScreen extends Screen {
 
 	@Override
 	public void onClose() {
-		this.minecraft.setScreen(this.parent);
+		this.minecraft.gui.setScreen(this.parent);
 	}
 
 	@Override

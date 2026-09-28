@@ -67,9 +67,9 @@ public record IslandRouterSlot(int size, float frequency, int noise, Slot slot,
 	}
 
 	@Override
-	public DensityFunction mapAll(DensityFunction.Visitor visitor) {
-		return visitor.apply(new IslandRouterSlot(this.size, this.frequency, this.noise, this.slot,
-				this.built.mapAll(visitor)));
+	public DensityFunction mapChildren(DensityFunction.Visitor visitor) {
+		return new IslandRouterSlot(this.size, this.frequency, this.noise, this.slot,
+				visitor.apply(this.built));
 	}
 
 	@Override

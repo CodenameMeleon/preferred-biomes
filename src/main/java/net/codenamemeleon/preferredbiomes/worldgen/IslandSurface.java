@@ -1,5 +1,6 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
@@ -65,7 +66,7 @@ public final class IslandSurface {
 	private static final ResourceKey<Biome>[] ICE_SPIKE_SHORES =
 			shores("ice_spikes_island", "frozen");
 
-	public static SurfaceRules.RuleSource rule(SurfaceRules.RuleSource vanilla,
+	public static SurfaceRules.RuleSource rule(HolderGetter<Biome> biomes, SurfaceRules.RuleSource vanilla,
 			int size, float frequency, int noise) {
 		SurfaceRules.ConditionSource nearWater =
 				new IslandShoreCondition(size, frequency, noise);
@@ -76,7 +77,7 @@ public final class IslandSurface {
 		SurfaceRules.ConditionSource depth =
 				SurfaceRules.stoneDepthCheck(0, true, SAND_DEPTH, CaveSurface.FLOOR);
 		SurfaceRules.ConditionSource redSand =
-				SurfaceRules.noiseCondition(RED_SAND_NOISE, RED_SAND_THRESHOLD);
+				SurfaceRules.noiseCondition2d(RED_SAND_NOISE, RED_SAND_THRESHOLD);
 
 		SurfaceRules.RuleSource redDesert = SurfaceRules.sequence(
 				SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR,
@@ -88,11 +89,11 @@ public final class IslandSurface {
 						SurfaceRules.state(Blocks.RED_SANDSTONE.defaultBlockState())));
 
 		SurfaceRules.RuleSource redDesertIsland = SurfaceRules.ifTrue(
-				SurfaceRules.isBiome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
+				SurfaceRules.isBiome(biomes, join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
 				SurfaceRules.ifTrue(redSand, redDesert));
 
 		SurfaceRules.RuleSource desertIsland = SurfaceRules.ifTrue(
-				SurfaceRules.isBiome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
+				SurfaceRules.isBiome(biomes, join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
 				SurfaceRules.sequence(
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
 								SurfaceRules.ifTrue(SurfaceRules.waterBlockCheck(-1, 0),
@@ -106,14 +107,14 @@ public final class IslandSurface {
 										SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())))));
 
 		SurfaceRules.RuleSource mangroveIsland = SurfaceRules.ifTrue(
-				SurfaceRules.isBiome(join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND)),
+				SurfaceRules.isBiome(biomes, join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND)),
 				SurfaceRules.sequence(
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
 								SurfaceRules.ifTrue(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(60), 0),
 										SurfaceRules.ifTrue(SurfaceRules.not(
 												SurfaceRules.yBlockCheck(VerticalAnchor.absolute(63), 0)),
 												SurfaceRules.ifTrue(
-														SurfaceRules.noiseCondition(
+														SurfaceRules.noiseCondition2d(
 																Noises.SWAMP, 0.0),
 														SurfaceRules.state(Blocks.WATER.defaultBlockState()))))),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
@@ -125,24 +126,24 @@ public final class IslandSurface {
 										SurfaceRules.state(Blocks.MUD.defaultBlockState())))));
 
 		SurfaceRules.RuleSource lushLand = SurfaceRules.ifTrue(
-				SurfaceRules.isBiome(join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND)),
+				SurfaceRules.isBiome(biomes, join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND)),
 				SurfaceRules.ifTrue(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(63), 0),
 						SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR,
 								SurfaceRules.state(Blocks.STONE.defaultBlockState()))));
 
-		SurfaceRules.RuleSource submergedFloor = submergedFloor();
+		SurfaceRules.RuleSource submergedFloor = submergedFloor(biomes);
 
 		SurfaceRules.RuleSource shore = SurfaceRules.ifTrue(atWaterline,
 				SurfaceRules.ifTrue(belowBandTop,
 						SurfaceRules.ifTrue(nearWater,
 								SurfaceRules.ifTrue(depth,
 										SurfaceRules.sequence(
-												ring(join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND), Blocks.MOSS_BLOCK),
-												ring(join(MUSHROOM_SHORES, Biomes.MUSHROOM_FIELDS), Blocks.MYCELIUM),
-												ring(join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND), Blocks.MUD),
-												ring(join(ICE_SPIKE_SHORES, IslandBiomes.ICE_SPIKES_ISLAND), Blocks.SNOW_BLOCK),
+												ring(biomes, join(LUSH_SHORES, IslandBiomes.LUSH_ISLAND), Blocks.MOSS_BLOCK),
+												ring(biomes, join(MUSHROOM_SHORES, Biomes.MUSHROOM_FIELDS), Blocks.MYCELIUM),
+												ring(biomes, join(MANGROVE_SHORES, IslandBiomes.MANGROVE_ISLAND), Blocks.MUD),
+												ring(biomes, join(ICE_SPIKE_SHORES, IslandBiomes.ICE_SPIKES_ISLAND), Blocks.SNOW_BLOCK),
 												SurfaceRules.ifTrue(
-														SurfaceRules.isBiome(join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
+														SurfaceRules.isBiome(biomes, join(DESERT_SHORES, IslandBiomes.DESERT_ISLAND)),
 														SurfaceRules.ifTrue(redSand,
 																SurfaceRules.state(Blocks.RED_SAND.defaultBlockState()))),
 												SurfaceRules.state(Blocks.SAND.defaultBlockState()))))));
@@ -152,23 +153,23 @@ public final class IslandSurface {
 				shore, vanilla);
 	}
 
-	private static SurfaceRules.RuleSource submergedFloor() {
+	private static SurfaceRules.RuleSource submergedFloor(HolderGetter<Biome> biomes) {
 		SurfaceRules.ConditionSource submerged =
 				SurfaceRules.not(SurfaceRules.waterBlockCheck(-1, 0));
-		SurfaceRules.ConditionSource anyShore = SurfaceRules.isBiome(
+		SurfaceRules.ConditionSource anyShore = SurfaceRules.isBiome(biomes,
 				join(FROZEN_SHORES, join(COLD_SHORES, join(TEMPERATE_SHORES,
 						join(LUKEWARM_SHORES, WARM_SHORES)))));
 		return SurfaceRules.ifTrue(anyShore, SurfaceRules.ifTrue(submerged,
 				SurfaceRules.sequence(
 						SurfaceRules.ifTrue(SurfaceRules.waterStartCheck(-6, -1),
-								SurfaceRules.ifTrue(SurfaceRules.isBiome(WARM_SHORES),
+								SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, WARM_SHORES),
 										SurfaceRules.ifTrue(
 												SurfaceRules.stoneDepthCheck(0, true, 6, CaveSurface.FLOOR),
 												SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())))),
 						SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
 								SurfaceRules.sequence(
 										SurfaceRules.ifTrue(
-												SurfaceRules.isBiome(join(WARM_SHORES, LUKEWARM_SHORES)),
+												SurfaceRules.isBiome(biomes, join(WARM_SHORES, LUKEWARM_SHORES)),
 												SurfaceRules.sequence(
 														SurfaceRules.ifTrue(SurfaceRules.ON_CEILING,
 																SurfaceRules.state(Blocks.SANDSTONE.defaultBlockState())),
@@ -179,8 +180,8 @@ public final class IslandSurface {
 												SurfaceRules.state(Blocks.GRAVEL.defaultBlockState())))))));
 	}
 
-	private static SurfaceRules.RuleSource ring(ResourceKey<Biome>[] biomes, Block block) {
-		return SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes),
+	private static SurfaceRules.RuleSource ring(HolderGetter<Biome> biomes, ResourceKey<Biome>[] keys, Block block) {
+		return SurfaceRules.ifTrue(SurfaceRules.isBiome(biomes, keys),
 				SurfaceRules.ifTrue(SurfaceRules.ON_FLOOR,
 						SurfaceRules.state(block.defaultBlockState())));
 	}

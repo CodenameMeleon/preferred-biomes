@@ -181,10 +181,11 @@ public final class IslandBiomes {
 			if (band >= 3) {
 				add(out, biomes, t, range(-1.0F, -0.5F), FULL, FULL, CAVES, FULL,
 						Biomes.DRIPSTONE_CAVES);
-				add(out, biomes, t, range(-0.5F, 0.7F), FULL, FULL, CAVES, FULL, SHALLOW[band]);
 			} else {
-				add(out, biomes, t, range(-1.0F, 0.7F), FULL, FULL, CAVES, FULL, SHALLOW[band]);
+				add(out, biomes, t, range(-1.0F, -0.5F), FULL, FULL, CAVES, FULL, SHALLOW[band]);
 			}
+			add(out, biomes, t, range(-0.5F, -0.2F), FULL, FULL, CAVES, FULL, Biomes.SULFUR_CAVES);
+			add(out, biomes, t, range(-0.2F, 0.7F), FULL, FULL, CAVES, FULL, SHALLOW[band]);
 
 			add(out, biomes, t, range(-1.0F, -0.1F), FULL, FULL, BOTTOM, FULL, Biomes.DEEP_DARK);
 			add(out, biomes, t, range(-0.1F, 1.0F), FULL, FULL, BOTTOM, FULL, SHALLOW[band]);

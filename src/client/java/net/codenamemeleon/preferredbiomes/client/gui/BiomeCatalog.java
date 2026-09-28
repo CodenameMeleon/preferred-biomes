@@ -13,10 +13,12 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.BlockItemTags;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
@@ -130,7 +132,7 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 
 	private static String displayNameOf(Identifier id) {
 		String key = id.toLanguageKey("biome");
-		return I18n.exists(key) ? I18n.get(key) : id.toString();
+		return Language.getInstance().has(key) ? I18n.get(key) : id.toString();
 	}
 
 	public int size() {
@@ -274,7 +276,7 @@ public record BiomeCatalog(List<BiomeCatalog.Entry> entries) {
 		}
 
 		private static boolean isSapling(Block block) {
-			if (block.defaultBlockState().is(BlockTags.SAPLINGS)) {
+			if (block.defaultBlockState().is(BlockItemTags.SAPLINGS.block())) {
 				return true;
 			}
 			if (block instanceof SaplingBlock || block instanceof MangrovePropaguleBlock) {

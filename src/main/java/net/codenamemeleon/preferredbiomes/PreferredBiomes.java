@@ -12,7 +12,7 @@ import net.fabricmc.api.ModInitializer;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.SpawnPlacementTypes;
 import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -35,7 +35,7 @@ public class PreferredBiomes implements ModInitializer {
 				IslandRouterSlot.CODEC.codec());
 
 		Registry.register(BuiltInRegistries.MATERIAL_CONDITION, id("island_shore"),
-				IslandShoreCondition.CODEC_HOLDER.codec());
+				IslandShoreCondition.MAP_CODEC);
 
 		Registry.register(BuiltInRegistries.FEATURE, id("azalea_hangings"),
 				new AzaleaHangingsFeature(NoneFeatureConfiguration.CODEC));
@@ -44,7 +44,7 @@ public class PreferredBiomes implements ModInitializer {
 		Registry.register(BuiltInRegistries.FEATURE, id("lush_island_pool_anchor"),
 				new LushIslandPoolFeature(NoneFeatureConfiguration.CODEC));
 
-		SpawnPlacements.register(EntityType.ALLAY, SpawnPlacementTypes.NO_RESTRICTIONS,
+		SpawnPlacements.register(EntityTypes.ALLAY, SpawnPlacementTypes.NO_RESTRICTIONS,
 				Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
 				(type, world, reason, pos, random) ->
 						world.getBiome(pos).is(IslandBiomes.DARK_FOREST_ISLAND)

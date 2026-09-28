@@ -1,12 +1,12 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.codenamemeleon.preferredbiomes.mixin.MaterialRuleContextAccessor;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.Noises;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
@@ -31,15 +31,14 @@ public final class IslandShoreCondition implements SurfaceRules.ConditionSource 
 
 	public static final Identifier SHORE_DITHER = Identifier.fromNamespaceAndPath("preferred-biomes", "shore_dither");
 
-	public static final KeyDispatchDataCodec<IslandShoreCondition> CODEC_HOLDER = KeyDispatchDataCodec.of(
-			RecordCodecBuilder.mapCodec(instance -> instance.group(
-					Codec.intRange(PreferredBiomeSource.MIN_ISLAND_SIZE, PreferredBiomeSource.MAX_ISLAND_SIZE)
-							.fieldOf("size").forGetter(IslandShoreCondition::size),
-					Codec.floatRange(0.0F, 1.0F).fieldOf("frequency")
-							.forGetter(IslandShoreCondition::frequency),
-					Codec.INT.optionalFieldOf("noise", PreferredBiomeSource.DEFAULT_ISLAND_NOISE)
-							.forGetter(IslandShoreCondition::noise)
-			).apply(instance, IslandShoreCondition::new)));
+	public static final MapCodec<IslandShoreCondition> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			Codec.intRange(PreferredBiomeSource.MIN_ISLAND_SIZE, PreferredBiomeSource.MAX_ISLAND_SIZE)
+					.fieldOf("size").forGetter(IslandShoreCondition::size),
+			Codec.floatRange(0.0F, 1.0F).fieldOf("frequency")
+					.forGetter(IslandShoreCondition::frequency),
+			Codec.INT.optionalFieldOf("noise", PreferredBiomeSource.DEFAULT_ISLAND_NOISE)
+					.forGetter(IslandShoreCondition::noise)
+	).apply(instance, IslandShoreCondition::new));
 
 	private final int size;
 	private final float frequency;
@@ -67,8 +66,8 @@ public final class IslandShoreCondition implements SurfaceRules.ConditionSource 
 	}
 
 	@Override
-	public KeyDispatchDataCodec<? extends SurfaceRules.ConditionSource> codec() {
-		return CODEC_HOLDER;
+	public MapCodec<? extends SurfaceRules.ConditionSource> codec() {
+		return MAP_CODEC;
 	}
 
 	private record Samplers(IslandField ring, PositionalRandomFactory dither) {

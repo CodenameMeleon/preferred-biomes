@@ -78,7 +78,8 @@ public final class IslandTerrain {
 				vanilla.defaultFluid(),
 				createRouter(vanilla.noiseRouter(), vanilla.noiseSettings(), functions, noises, size,
 						frequency, noise),
-				IslandSurface.rule(vanilla.surfaceRule(), size, frequency, noise),
+				IslandSurface.rule(registryManager.lookupOrThrow(Registries.BIOME), vanilla.surfaceRule(),
+						size, frequency, noise),
 				vanilla.spawnTarget(),
 				vanilla.seaLevel(),
 				vanilla.disableMobGeneration(),
@@ -361,11 +362,7 @@ public final class IslandTerrain {
 	}
 
 	private static DensityFunctions.Spline.Coordinate wrap(DensityFunction function) {
-		Holder<DensityFunction> entry =
-				function instanceof DensityFunctions.HolderHolder holder
-						? holder.function()
-						: Holder.direct(function);
-		return new DensityFunctions.Spline.Coordinate(entry);
+		return new DensityFunctions.Spline.Coordinate(function);
 	}
 
 	private static Holder<NormalNoise.NoiseParameters> noise(
