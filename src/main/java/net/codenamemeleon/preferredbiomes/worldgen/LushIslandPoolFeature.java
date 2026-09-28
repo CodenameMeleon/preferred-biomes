@@ -1,6 +1,7 @@
 package net.codenamemeleon.preferredbiomes.worldgen;
 
 import com.mojang.serialization.Codec;
+import net.codenamemeleon.preferredbiomes.PreferredBiomeTags;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
@@ -52,7 +53,12 @@ public class LushIslandPoolFeature extends Feature<DefaultFeatureConfig> {
 
 		int x = anchor.getX();
 		int z = anchor.getZ();
-		BlockPos pos = new BlockPos(x, world.getTopY(Heightmap.Type.WORLD_SURFACE_WG, x, z), z);
+		int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE_WG, x, z);
+		if (!world.getBiome(new BlockPos(anchor.getX(), surfaceY, anchor.getZ()))
+				.isIn(PreferredBiomeTags.LUSH_ISLANDS)) {
+			return false;
+		}
+		BlockPos pos = new BlockPos(x, surfaceY, z);
 		return world.getRegistryManager().get(RegistryKeys.CONFIGURED_FEATURE)
 				.getOrEmpty(POOL)
 				.map(pool -> pool.generate(world, context.getGenerator(), context.getRandom(), pos))
