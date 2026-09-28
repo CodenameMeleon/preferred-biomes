@@ -2,7 +2,8 @@
   "feature": "preferred-biomes:lush_island_pool_anchor",
   "placement": [
     {
-      "type": "minecraft:biome"
+      "type": "minecraft:count",
+      "count": 1
     }
   ]
 }
